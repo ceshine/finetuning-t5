@@ -209,15 +209,15 @@ def main(t5_model: str = "t5-base", lr: float = 1e-4, steps: Optional[int] = Non
     tokenizer = T5Tokenizer.from_pretrained(t5_model)
     # print(model.config.decoder_start_token_id)
     # print(tokenizer.pad_token_id)
-    train_dataset = ParaphraseDataset(tokenizer, 'data/quora_train.csv', 256)
-    valid_dataset = ParaphraseDataset(tokenizer, 'data/quora_valid.csv', 256)
+    train_dataset = ParaphraseDataset(tokenizer, 'data/quora_train.csv', 64)
+    valid_dataset = ParaphraseDataset(tokenizer, 'data/quora_valid.csv', 64)
     print("Train dataset: ", len(train_dataset))
     print("Valid dataset: ", len(valid_dataset))
     train_loader = DataLoader(
-        train_dataset, num_workers=0,
+        train_dataset, num_workers=0, shuffle=True, drop_last=True,
         batch_size=16, collate_fn=partial(collate_batch, pad=model.config.decoder_start_token_id))
     valid_loader = DataLoader(
-        valid_dataset, num_workers=0,
+        valid_dataset, num_workers=0, shuffle=False, drop_last=False,
         batch_size=24, collate_fn=partial(collate_batch, pad=model.config.decoder_start_token_id))
     optimizer = RAdam(
         model.parameters(), lr=lr
@@ -288,11 +288,15 @@ def main(t5_model: str = "t5-base", lr: float = 1e-4, steps: Optional[int] = Non
     )
     bot.train(
         total_steps=steps,
-        checkpoint_interval=len(train_loader) // 5
+        checkpoint_interval=steps // 10
     )
     bot.load_model(checkpoints.best_performers[0][1])
-    torch.save(bot.model.state_dict(), CACHE_DIR /
-               "final_weights.pth")
+    # torch.save(bot.model.state_dict(), CACHE_DIR /
+    #            "final_weights.pth")
+    target_dir = CACHE_DIR / "t5-finetuned"
+    target_dir.mkdir(exist_ok=True, parents=True)
+    bot.model.save_pretrained(target_dir)
+    tokenizer.save_pretrained(target_dir)
     checkpoints.remove_checkpoints(keep=0)
 
 
