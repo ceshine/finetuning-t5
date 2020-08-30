@@ -119,13 +119,21 @@ class ParaphraseDataset(Dataset):
         self._build()
 
     def __len__(self):
-        return len(self.input_ids)
+        return len(self.input_ids) * 2
 
     def __getitem__(self, index):
-        return (
-            self.input_ids[index], self.input_masks[index],
-            self.target_ids[index], self.target_masks[index]
-        )
+        if index >= len(self.input_ids):
+            # flip the input and target
+            index = index - len(self.input_ids)
+            return (
+                self.target_ids[index], self.target_masks[index],
+                self.input_ids[index], self.input_masks[index]
+            )
+        else:
+            return (
+                self.input_ids[index], self.input_masks[index],
+                self.target_ids[index], self.target_masks[index]
+            )
         # return {"source_ids": source_ids, "source_mask": src_mask, "target_ids": target_ids, "target_mask": target_mask}
         # return (
         #     source_ids, src_mask, target_ids, target_mask,
