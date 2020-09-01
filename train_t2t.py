@@ -7,7 +7,7 @@ import enum
 from functools import partial
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 
 import typer
 import joblib
@@ -44,6 +44,7 @@ CACHE_DIR.mkdir(exist_ok=True, parents=True)
 class Corpus(enum.Enum):
     QUORA = "quora"
     PAWS = "paws"
+    Q_and_P = "quora+paws"
 
 
 @dataclass
@@ -107,8 +108,21 @@ def masked_cross_entropy_loss(outputs, targets):
 
 
 class ParaphraseDataset(Dataset):
-    def __init__(self, filepath, context_tokens):
-        self.input_ids, self.target_ids = joblib.load(filepath)
+    def __init__(self, corpus, file_suffix: str, context_tokens: List[int]):
+        input_ids, target_ids = [], []
+        if corpus in (Corpus.PAWS, Corpus.Q_and_P):
+            tmp = joblib.load(CACHE_DIR / f'paws{file_suffix}')
+            multiplier = 1
+            if corpus is Corpus.Q_and_P:
+                # oversample PAWS
+                multiplier = 2
+            input_ids.extend(tmp[0] * multiplier)
+            target_ids.extend(tmp[1] * multiplier)
+        if corpus in (Corpus.QUORA, Corpus.Q_and_P):
+            tmp = joblib.load(CACHE_DIR / f'quora{file_suffix}')
+            input_ids.extend(tmp[0])
+            target_ids.extend(tmp[1])
+        self.input_ids, self.target_ids = input_ids, target_ids
         self.context_tokens = context_tokens
 
     def __len__(self):
@@ -199,8 +213,8 @@ def main(
     context_tokens = tokenizer.encode("paraphrase: ")
     # print(model.config.decoder_start_token_id)
     # print(tokenizer.pad_token_id)
-    train_dataset = ParaphraseDataset(CACHE_DIR / f'{dataset.value}_train.jbl', context_tokens)
-    valid_dataset = ParaphraseDataset(CACHE_DIR / f'{dataset.value}_valid.jbl', context_tokens)
+    train_dataset = ParaphraseDataset(dataset, '_train.jbl', context_tokens)
+    valid_dataset = ParaphraseDataset(dataset, '_valid.jbl', context_tokens)
     print("Train dataset: ", len(train_dataset))
     print("Valid dataset: ", len(valid_dataset))
     collate_fn = partial(
@@ -239,8 +253,8 @@ def main(
     )
     callbacks = [
         MovingAverageStatsTrackerCallback(
-            avg_window=len(train_loader) // 8,
-            log_interval=len(train_loader) // 10
+            avg_window=steps // 16,
+            log_interval=steps // 20
         ),
         LearningRateSchedulerCallback(
             MultiStageScheduler(
@@ -286,7 +300,7 @@ def main(
     )
     bot.train(
         total_steps=steps,
-        checkpoint_interval=steps // 10
+        checkpoint_interval=steps // 5
     )
     bot.load_model(checkpoints.best_performers[0][1])
     # torch.save(bot.model.state_dict(), CACHE_DIR /
