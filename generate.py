@@ -14,10 +14,11 @@ def main(model_path: str):
             break
         generated = model.generate(
             tokenizer.encode("paraphrase: " + sent + " </s>", return_tensors="pt").cuda(),
-            num_beams=5, num_return_sequences=3
+            num_beams=10, num_return_sequences=3, max_length=64
         )
         for generated_sentence in generated:
             # print(generated_sentence)
+            # print(len(generated_sentence))
             print(
                 tokenizer.decode(
                     generated_sentence

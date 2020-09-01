@@ -8,6 +8,8 @@ if __name__ == "__main__":
     question_pairs.drop(['qid1', 'qid2', 'id'], axis=1, inplace=True)
     question_pairs_correct_paraphrased = question_pairs[question_pairs['is_duplicate'] == 1].copy()
     question_pairs_correct_paraphrased.drop(['is_duplicate'], axis=1, inplace=True)
+    question_pairs_correct_paraphrased.rename(
+        columns={"question1": "sentence1", "question2": "sentence2"}, inplace=True)
     train, test = train_test_split(question_pairs_correct_paraphrased, test_size=0.2)
     valid, test = train_test_split(test, test_size=0.5)
     train.to_csv('data/quora_train.csv', index=False)
