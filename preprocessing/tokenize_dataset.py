@@ -28,8 +28,8 @@ def process_file(data: pd.DataFrame, tokenizer: T5Tokenizer, batch_size: int):
                 data.loc[j, "sentence2"]
             )
             # The "paraphrase: " tokens are added later in the collate_fn
-            input_ = input_ + " </s>"
-            target = target + " </s>"
+            # input_ = input_ + " </s>"
+            # target = target + " </s>"
             input_buffer.append(input_)
             target_buffer.append(target)
         # tokenize inputs

@@ -3,7 +3,7 @@ import typer
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 
-def main(model_path: str):
+def main(model_path: str, num_outputs: int = 5, max_length: int = 64):
     tokenizer = T5Tokenizer.from_pretrained("t5-base")
     # print(tokenizer.encode("</s>"))
     model = T5ForConditionalGeneration.from_pretrained(model_path).cuda()
@@ -13,8 +13,8 @@ def main(model_path: str):
         if sent == "exit":
             break
         generated = model.generate(
-            tokenizer.encode("paraphrase: " + sent + " </s>", return_tensors="pt").cuda(),
-            num_beams=10, num_return_sequences=3, max_length=64
+            tokenizer.encode("paraphrase: " + sent, return_tensors="pt").cuda(),
+            num_beams=10, num_return_sequences=num_outputs, max_length=max_length
         )
         for generated_sentence in generated:
             # print(generated_sentence)

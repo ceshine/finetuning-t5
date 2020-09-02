@@ -4,7 +4,7 @@
 
 - Python 3.8.3
 - PyTorch 1.5
-- Transformers 2.11.0
+- Transformers 3.1.0
 - nltk 3.2.5
 
 ## Datasets
