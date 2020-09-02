@@ -51,4 +51,8 @@ A pre-trained model trained on both PAWS and Quora datasets [is published on Hug
 python generate.py ceshine/t5-paraphrase-quora-paws --num-outputs 5
 ```
 
+### Sample Outputs
+
 ![Sample output 1](imgs/sample-output-1.png)
+
+![Sample output 2](imgs/sample-output-2.png)
