@@ -6,6 +6,7 @@
 - PyTorch 1.5
 - Transformers 3.1.0
 - nltk 3.2.5
+- [PyTorch Helper Bot 0.7.0](https://github.com/ceshine/pytorch-helper-bot/tree/0.7.0)
 
 ## Datasets
 
