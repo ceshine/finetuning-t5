@@ -16,6 +16,7 @@ def main(model_path: str, num_outputs: int = 5, max_length: int = 64):
             tokenizer.encode("paraphrase: " + sent, return_tensors="pt").cuda(),
             num_beams=10, num_return_sequences=num_outputs, max_length=max_length
         )
+        print("")
         for generated_sentence in generated:
             # print(generated_sentence)
             # print(len(generated_sentence))

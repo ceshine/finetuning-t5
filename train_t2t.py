@@ -1,35 +1,30 @@
 """
 Reference: https://github.com/ramsrigouthamg/Paraphrase-any-question-with-T5-Text-To-Text-Transfer-Transformer-
 """
-import os
-import math
 import enum
+import math
+import os
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Optional, List
+from typing import List, Optional
 
-import typer
 import joblib
 import numpy as np
-from tqdm import tqdm
 import torch
-from torch import nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from pytorch_helper_bot import (
-    BaseBot, LearningRateSchedulerCallback,
-    MovingAverageStatsTrackerCallback,
-    CheckpointCallback,
-    # EarlyStoppingCallback,
-    MultiStageScheduler, LinearLR,
-    TelegramCallback
-    # WandbCallback,
-)
+import typer
 from pytorch_helper_bot.bot import batch_to_device
 from pytorch_helper_bot.optimizers import RAdam
+from tqdm import tqdm
+from torch import nn
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader, Dataset
 from transformers import T5ForConditionalGeneration, T5Tokenizer
+
+from pytorch_helper_bot import (  # EarlyStoppingCallback,; WandbCallback,
+    BaseBot, CheckpointCallback, LearningRateSchedulerCallback, LinearLR,
+    MovingAverageStatsTrackerCallback, MultiStageScheduler, TelegramCallback)
 
 try:
     from apex import amp
@@ -44,7 +39,10 @@ CACHE_DIR.mkdir(exist_ok=True, parents=True)
 class Corpus(enum.Enum):
     QUORA = "quora"
     PAWS = "paws"
-    Q_and_P = "quora+paws"
+    MSRP = "msrp"
+    OPINOSIS = "opinosis"
+    QP = "quora+paws"
+    PMO = "paws+msrp+opinosis"
 
 
 @dataclass
@@ -110,18 +108,34 @@ def masked_cross_entropy_loss(outputs, targets):
 class ParaphraseDataset(Dataset):
     def __init__(self, corpus, file_suffix: str, context_tokens: List[int]):
         input_ids, target_ids = [], []
-        if corpus in (Corpus.PAWS, Corpus.Q_and_P):
+        if corpus in (Corpus.PAWS, Corpus.QP, Corpus.PMO):
             tmp = joblib.load(CACHE_DIR / f'paws{file_suffix}')
             multiplier = 1
-            if corpus is Corpus.Q_and_P:
+            if corpus is Corpus.QP:
                 # oversample PAWS
                 multiplier = 2
             input_ids.extend(tmp[0] * multiplier)
             target_ids.extend(tmp[1] * multiplier)
-        if corpus in (Corpus.QUORA, Corpus.Q_and_P):
+        if corpus in (Corpus.QUORA, Corpus.QP):
             tmp = joblib.load(CACHE_DIR / f'quora{file_suffix}')
             input_ids.extend(tmp[0])
             target_ids.extend(tmp[1])
+        if corpus in (Corpus.MSRP, Corpus.PMO):
+            tmp = joblib.load(CACHE_DIR / f'msrp{file_suffix}')
+            multiplier = 1
+            if corpus is Corpus.PMO:
+                # oversample MSRP
+                multiplier = 2
+            input_ids.extend(tmp[0] * multiplier)
+            target_ids.extend(tmp[1] * multiplier)
+        if corpus in (Corpus.OPINOSIS, Corpus.PMO):
+            tmp = joblib.load(CACHE_DIR / f'opinosis{file_suffix}')
+            multiplier = 1
+            if corpus is Corpus.PMO:
+                # oversample MSRP
+                multiplier = 2
+            input_ids.extend(tmp[0] * multiplier)
+            target_ids.extend(tmp[1] * multiplier)
         self.input_ids, self.target_ids = input_ids, target_ids
         self.context_tokens = context_tokens
 
