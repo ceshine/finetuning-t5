@@ -12,6 +12,9 @@
 
 - [PAWS: Paraphrase Adversaries from Word Scrambling](https://github.com/google-research-datasets/paws)
 - [Quora Question Pairs](https://www.quora.com/q/quoradata/First-Quora-Dataset-Release-Question-Pairs)
+- [Paraphrase Grouped Corpora](https://www.oxinabox.net/resources/paraphrase_grouped_corpora/)
+  - Opinosis
+  - MSRP
 
 The datasets are put into the `/data/` folder. Please refer to preprocessing script (for now) for the sub-folder namings of the PAWS dataset.
 
@@ -24,6 +27,8 @@ These two scripts will normalize the data and create train/valid/test split:
 ```bash
 python preprocessing/preprocess_quora.py
 python preprocessing/preprocess_paws.py
+python preprocessing/preprocess_grouped_paraphrases.py data/msrp_distribute/
+python preprocessing/preprocess_grouped_paraphrases.py data/opinosis_distribute/ --detokenize
 ```
 
 Pre-tokenize the dataset:
@@ -31,6 +36,8 @@ Pre-tokenize the dataset:
 ```bash
 python preprocessing/tokenize_dataset.py quora
 python preprocessing/tokenize_dataset.py paws
+python preprocessing/tokenize_dataset.py msrp
+python preprocessing/tokenize_dataset.py opinosis
 ```
 
 ### Training

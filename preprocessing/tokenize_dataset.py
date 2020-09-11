@@ -14,6 +14,8 @@ CACHE_PATH = Path("cache/")
 class Dataset(enum.Enum):
     QUORA = "quora"
     PAWS = "paws"
+    MSRP = "msrp"
+    OPINOSIS = "opinosis"
 
 
 def process_file(data: pd.DataFrame, tokenizer: T5Tokenizer, batch_size: int):
@@ -48,6 +50,8 @@ def process_file(data: pd.DataFrame, tokenizer: T5Tokenizer, batch_size: int):
 def main(dataset: Dataset, tokenizer_name: str = "t5-base", batch_size: int = 1024):
     tokenizer = T5Tokenizer.from_pretrained(tokenizer_name)
     for datafile in (f"{dataset.value}_train.csv", f"{dataset.value}_valid.csv", f"{dataset.value}_test.csv"):
+        if not (DATA_PATH / datafile).exists():
+            continue
         print(datafile)
         data = pd.read_csv(DATA_PATH / datafile)
         input_ids, target_ids = process_file(data, tokenizer, batch_size)
