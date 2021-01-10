@@ -4,33 +4,21 @@ Reference: https://github.com/ramsrigouthamg/Paraphrase-any-question-with-T5-Tex
 import enum
 import math
 import os
-from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
-from typing import List, Optional
+from functools import partial
+from typing import List, Callable
+from dataclasses import dataclass, asdict
 
+import typer
 import joblib
 import numpy as np
 import torch
 import torch.nn.functional as F
-import typer
-from pytorch_helper_bot.bot import batch_to_device
-from pytorch_helper_bot.optimizers import RAdam
-from tqdm import tqdm
-from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader, Dataset
+import pytorch_lightning as pl
+import pytorch_lightning_spells as pls
 from transformers import T5ForConditionalGeneration, T5Tokenizer
-
-from pytorch_helper_bot import (  # EarlyStoppingCallback,; WandbCallback,
-    BaseBot, CheckpointCallback, LearningRateSchedulerCallback, LinearLR,
-    MovingAverageStatsTrackerCallback, MultiStageScheduler, TelegramCallback)
-
-try:
-    from apex import amp
-    APEX_AVAILABLE = True
-except ModuleNotFoundError:
-    APEX_AVAILABLE = False
 
 CACHE_DIR = Path("cache/")
 CACHE_DIR.mkdir(exist_ok=True, parents=True)
@@ -46,50 +34,138 @@ class Corpus(enum.Enum):
 
 
 @dataclass
-class T2TBot(BaseBot):
-    log_dir: Path = CACHE_DIR / "logs/"
+class Config:
+    base_t5_model: str
+    batch_size: int
+    fp16: bool
+    dataset: Corpus
+    learning_rate: float
+    weight_decay: float
+    epochs: int
+    max_len: int
+    loss_fn: Callable
+    num_gpus: int = 1
+    grad_accu: int = 1
 
-    def __post_init__(self):
-        super().__post_init__()
-        self.loss_format = "%.6f"
 
-    @staticmethod
-    def extract_prediction(output):
-        return output[0]
+class T5Model(pl.LightningModule):
+    def __init__(self, config: Config, **kwargs):
+        super().__init__()
+        self.config = config
+        # log the config values
+        self.save_hyperparameters(asdict(config))
+        self.model = T5ForConditionalGeneration.from_pretrained(config.base_t5_model)
+        self.tokenizer = T5Tokenizer.from_pretrained(config.base_t5_model)
+        self.context_tokens = self.tokenizer.encode("paraphrase: ")
+        self.collate_fn = partial(
+            collate_batch, pad=self.model.config.decoder_start_token_id,
+            decode_start_token=self.model.config.pad_token_id,
+            max_len=self.config.max_len
+        )
+        self.metrics = [
+            ("acc", pl.metrics.Accuracy(compute_on_step=False))
+        ]
+        self.train_loss_tracker = pls.utils.EMATracker(alpha=0.02)
+        self.train_dataset = ParaphraseDataset(self.config.dataset, '_train.jbl', self.context_tokens)
+        print("Train dataset: ", len(self.train_dataset))
+        self.valid_dataset = ParaphraseDataset(self.config.dataset, '_valid.jbl', self.context_tokens)
+        print("Valid dataset: ", len(self.valid_dataset))
 
-    def eval(self, loader):
-        """Override to avoid OOM"""
-        self.model.eval()
-        preds, ys = [], []
-        losses, weights = [], []
-        self.logger.debug("Evaluating...")
-        with torch.no_grad():
-            for *input_tensors, y_local in tqdm(loader, disable=not self.pbar, ncols=100):
-                input_tensors, y_local = self.run_batch_inputs_callbacks(
-                    input_tensors, y_local, is_eval=True)
-                input_tensors = batch_to_device(input_tensors, self.device)
-                y_local = batch_to_device([y_local], self.device)[0]
-                if len(input_tensors) == 1 and isinstance(input_tensors[0], dict):
-                    output = self.extract_prediction(
-                        self.model(**input_tensors[0]))
-                else:
-                    output = self.extract_prediction(
-                        self.model(*input_tensors))
-                batch_loss = self.criterion(output, y_local)
-                losses.append(batch_loss.data.cpu().item())
-                weights.append(output.size(self.batch_dim))
-                # Save batch labels and predictions
-                # THE FOLLOWING TWO LINES WERE CHANGED
-                preds.append(torch.argmax(output, dim=-1)[:, :y_local["ids"].size(1)].cpu())
-                ys.append(batch_to_device([y_local], "cpu")[0])
-        loss = np.average(losses, weights=weights)
-        metrics = {"loss": (loss, self.loss_format % loss)}
-        # THE FOLLOWING LINE WAS CHANGED BECAUSE THE SHAPES OF ys ARE NOT CONSTANT
-        global_ys, global_preds = ys, preds
-        for metric in self.metrics:
-            metric_loss, metric_string = metric(global_ys, global_preds)
-            metrics[metric.name] = (metric_loss, metric_string)
-        return metrics
+    def forward(self, input_tensors):
+        return self.model(**input_tensors)[0]
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset, num_workers=1, shuffle=True, drop_last=True,
+            batch_size=self.config.batch_size, collate_fn=self.collate_fn)
+
+    def get_progress_bar_dict(self):
+        # don't show the experiment version number
+        items = super().get_progress_bar_dict()
+        items.pop("v_num", None)
+        return items
+
+    def val_dataloader(self):
+        return DataLoader(
+            self.valid_dataset, num_workers=1, shuffle=False, drop_last=False,
+            batch_size=self.config.batch_size*2, collate_fn=self.collate_fn)
+
+    def validation_step(self, batch, batch_idx):
+        logits = self.forward(batch[0])
+        loss = self.config.loss_fn(
+            logits,
+            batch[1]
+        )
+        preds = torch.argmax(logits, dim=-1)[:, :batch[1]["ids"].size(1)]
+        return {
+            'loss': loss,
+            'preds': preds,
+            'target': batch[1]
+        }
+
+    def validation_step_end(self, outputs):
+        self.log('val_loss', outputs['loss'].mean())
+        for name, metric in self.metrics:
+            metric(
+                outputs['preds'].view(-1).cpu(),
+                outputs['target']['ids'].view(-1).cpu()
+            )
+            self.log("val_" + name, metric)
+
+    def _should_log(self, flag):
+        if (self.trainer.global_step + 1) % self.trainer.log_every_n_steps == 0:
+            if isinstance(flag, list):
+                return flag[0]
+            return flag
+        return False
+
+    def training_step_end(self, outputs):
+        loss = outputs["loss"].mean()
+        self.train_loss_tracker.update(loss.detach())
+        if self._should_log(outputs["log"]):
+            self.logger.log_metrics({
+                "train_loss": self.train_loss_tracker.value
+            }, step=self.global_step)
+        return loss
+
+    def training_step(self, batch, batch_idx):
+        loss = self.config.loss_fn(
+            self.forward(batch[0]),
+            batch[1]
+        )
+        return {"loss": loss, "log": batch_idx % self.trainer.accumulate_grad_batches == 0}
+
+    def configure_optimizers(self):
+        optimizer = pls.optimizers.RAdam(
+            self.model.parameters(), lr=self.config.learning_rate,
+            weight_decay=self.config.weight_decay
+        )
+        steps_per_epochs = math.floor(
+            len(self.train_dataset) / self.config.batch_size / self.config.grad_accu  # / self.num_gpus # dpp mode
+        )
+        print("Steps per epochs:", steps_per_epochs)
+        n_steps = steps_per_epochs * self.config.epochs
+        lr_durations = [
+            int(n_steps*0.05),
+            int(np.ceil(n_steps*0.95)) + 1
+        ]
+        break_points = [0] + list(np.cumsum(lr_durations))[:-1]
+        scheduler = {
+            'scheduler': pls.lr_schedulers.MultiStageScheduler(
+                [
+                    pls.lr_schedulers.LinearLR(optimizer, 0.01, lr_durations[0]),
+                    CosineAnnealingLR(optimizer, lr_durations[1])
+                ],
+                start_at_epochs=break_points
+            ),
+            'interval': 'step',
+            'frequency': 1,
+            'strict': True,
+        }
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler
+        }
 
 
 def masked_cross_entropy_loss(outputs, targets):
@@ -106,7 +182,7 @@ def masked_cross_entropy_loss(outputs, targets):
 
 
 class ParaphraseDataset(Dataset):
-    def __init__(self, corpus, file_suffix: str, context_tokens: List[int]):
+    def __init__(self, corpus: Corpus, file_suffix: str, context_tokens: List[int]):
         input_ids, target_ids = [], []
         if corpus in (Corpus.PAWS, Corpus.QP, Corpus.PMO):
             tmp = joblib.load(CACHE_DIR / f'paws{file_suffix}')
@@ -192,138 +268,76 @@ def collate_batch(batch, max_len, pad=0, decode_start_token=0):
     )
 
 
-def test_run(model, optimizer, batch_size, max_len, loss_fn, use_amp: bool):
-    dummy_tensor = torch.ones((batch_size, max_len)).long().cuda()
-    print(dummy_tensor.shape)
-    for _ in range(5):
-        outputs = model(
-            input_ids=dummy_tensor.clone(),
-            attention_mask=dummy_tensor.clone(),
-            decoder_input_ids=dummy_tensor.clone()
-        )
-        loss = loss_fn(outputs[0], {
-            "ids": dummy_tensor.clone(),
-            "mask": dummy_tensor.clone()
-        })
-        if use_amp:
-            with amp.scale_loss(
-                loss, optimizer
-            ) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            loss.backward()
-    # do not actually use the gradients
-    optimizer.zero_grad()
-
-
 def main(
     t5_model: str = "t5-base", lr: float = 1e-4,
-    steps: Optional[int] = None, amp_level: str = "",
+    epochs: int = 5, fp16: bool = False,
     dataset: Corpus = Corpus.PAWS, batch_size: int = 16,
-    max_len: int = 64, grad_accu: int = 1
+    max_len: int = 64, grad_accu: int = 1,
+    num_gpus: int = 1
 ):
-    model = T5ForConditionalGeneration.from_pretrained(t5_model).cuda()
-    tokenizer = T5Tokenizer.from_pretrained(t5_model)
-    context_tokens = tokenizer.encode("paraphrase: ")
-    # print(model.config.decoder_start_token_id)
-    # print(tokenizer.pad_token_id)
-    train_dataset = ParaphraseDataset(dataset, '_train.jbl', context_tokens)
-    valid_dataset = ParaphraseDataset(dataset, '_valid.jbl', context_tokens)
-    print("Train dataset: ", len(train_dataset))
-    print("Valid dataset: ", len(valid_dataset))
-    collate_fn = partial(
-        collate_batch, pad=model.config.decoder_start_token_id,
-        decode_start_token=model.config.pad_token_id,
-        max_len=max_len
+    pl.seed_everything(int(os.environ.get("SEED", 738)))
+    config = Config(
+        base_t5_model=t5_model,
+        learning_rate=lr,
+        epochs=epochs,
+        dataset=dataset,
+        max_len=max_len,
+        grad_accu=grad_accu,
+        batch_size=batch_size,
+        fp16=fp16,
+        weight_decay=0,
+        num_gpus=num_gpus,
+        loss_fn=masked_cross_entropy_loss
     )
-    train_loader = DataLoader(
-        train_dataset, num_workers=0, shuffle=True, drop_last=True,
-        batch_size=batch_size, collate_fn=collate_fn)
-    valid_loader = DataLoader(
-        valid_dataset, num_workers=0, shuffle=False, drop_last=False,
-        batch_size=batch_size*2, collate_fn=collate_fn)
-    optimizer = RAdam(
-        model.parameters(), lr=lr
-    )
-    if amp_level:
-        if not APEX_AVAILABLE:
-            raise ValueError("Apex is not installed!")
-        model, optimizer = amp.initialize(
-            model, optimizer, opt_level=amp_level
-        )
-    test_run(model, optimizer, batch_size, max_len=max_len, loss_fn=masked_cross_entropy_loss, use_amp=amp_level != "")
-    if steps is None:
-        # By default train for 2 epochs
-        steps = len(train_loader) * 2
-    lr_durations = [
-        int(steps*0.1),
-        int(np.ceil(steps*0.9))
-    ]
-    break_points = [0] + list(np.cumsum(lr_durations))[:-1]
-    checkpoints = CheckpointCallback(
-        keep_n_checkpoints=1,
-        checkpoint_dir=CACHE_DIR / "model_cache/",
-        monitor_metric="loss"
-    )
+
+    pl_module = T5Model(config)
+
     callbacks = [
-        MovingAverageStatsTrackerCallback(
-            avg_window=steps // 16,
-            log_interval=steps // 20
+        pl.callbacks.ModelCheckpoint(
+            dirpath=str(CACHE_DIR / "model_checkpoints"),
+            monitor='val_loss',
+            mode="min",
+            filename='{step:06d}-{val_loss:.4f}',
+            save_top_k=1,
+            save_last=False
         ),
-        LearningRateSchedulerCallback(
-            MultiStageScheduler(
-                [
-                    LinearLR(optimizer, 0.01, lr_durations[0]),
-                    CosineAnnealingLR(optimizer, lr_durations[1], eta_min=1e-8)
-                ],
-                start_at_epochs=break_points
-            )
-        ),
-        checkpoints
-        # EarlyStoppingCallback(
-        #     patience=8, min_improv=1e-2,
-        #     monitor_metric="accuracy"
-        # ),
-        # WandbCallback(
-        #     config={
-        #         "epochs": args.epochs,
-        #         "arch": args.arch
-        #     },
-        #     name="Imagenatte",
-        #     watch_freq=200,
-        #     watch_level="gradients"
-        # )
+        pl.callbacks.LearningRateMonitor(logging_interval='step'),
     ]
-    if os.environ.get("TELEGRAM_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"):
-        callbacks.append(TelegramCallback(
-            token=os.environ.get("TELEGRAM_TOKEN"),
-            chat_id=os.environ.get("TELEGRAM_CHAT_ID"), name="T5",
-            report_evals=True
-        ))
-    # for batch in valid_loader:
-    #     print(batch[0].size(), batch[1].size())
-    bot = T2TBot(
-        model=model, train_loader=train_loader,
-        valid_loader=valid_loader, clip_grad=10.,
-        optimizer=optimizer, echo=True,
-        criterion=masked_cross_entropy_loss,
+    trainer = pl.Trainer(
+        accelerator='dp' if num_gpus > 1 else None,
+        # amp_backend="apex", amp_level='O2',
+        precision=16 if config.fp16 else 32,
+        gpus=config.num_gpus,
+        val_check_interval=0.25,
+        gradient_clip_val=10,
+        max_epochs=epochs,
+        # max_steps=steps,
         callbacks=callbacks,
-        pbar=True, use_tensorboard=True,
-        use_amp=(amp_level != ''),
-        gradient_accumulation_steps=grad_accu
+        accumulate_grad_batches=grad_accu,
+        # auto_scale_batch_size='power' if batch_size is None else None,
+        logger=[
+            pl.loggers.TensorBoardLogger(str(CACHE_DIR / "tb_logs"), name=""),
+            pls.loggers.ScreenLogger(),
+            # pl.loggers.WandbLogger(project="t5-paraphrase")
+        ],
+        log_every_n_steps=100
     )
-    bot.train(
-        total_steps=steps,
-        checkpoint_interval=steps // 5
+
+    trainer.fit(pl_module)
+
+    # pl_module.model.save_pretrained(CACHE_DIR / f"{config.base_t5_model}_last")
+    # pl_module.tokenizer.save_pretrained(CACHE_DIR / f"{config.base_t5_model}_last")
+    # print("Last model saved")
+
+    assert isinstance(callbacks[0], pl.callbacks.ModelCheckpoint)
+    print(callbacks[0].best_model_path)
+    pl_module = T5Model.load_from_checkpoint(
+        callbacks[0].best_model_path,
+        config=config
     )
-    bot.load_model(checkpoints.best_performers[0][1])
-    # torch.save(bot.model.state_dict(), CACHE_DIR /
-    #            "final_weights.pth")
-    target_dir = CACHE_DIR / "t5-finetuned"
-    target_dir.mkdir(exist_ok=True, parents=True)
-    bot.model.save_pretrained(target_dir)
-    tokenizer.save_pretrained(target_dir)
-    checkpoints.remove_checkpoints(keep=0)
+    pl_module.model.save_pretrained(CACHE_DIR / f"{config.base_t5_model}_best")
+    pl_module.tokenizer.save_pretrained(CACHE_DIR / f"{config.base_t5_model}_best")
+    print("Best model saved")
 
 
 if __name__ == "__main__":
