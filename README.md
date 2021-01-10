@@ -4,9 +4,9 @@
 
 - Python 3.8.3
 - PyTorch 1.5
-- Transformers 3.1.0
+- Transformers >= 3.1.0
 - nltk 3.2.5
-- [PyTorch Helper Bot 0.7.0](https://github.com/ceshine/pytorch-helper-bot/tree/0.7.0) (For training only)
+- Pytorch Lightning 1.1.3
 
 ## Datasets
 
@@ -45,7 +45,7 @@ python preprocessing/tokenize_dataset.py opinosis
 Example:
 
 ```bash
-python train_t2t.py --amp-level O1 --steps 80000 --dataset quora+paws --batch-size 8 --grad-accu 2 --max-len 64
+python train_t2t.py --fp16 --epochs 5 --dataset quora+paws+opinosis --batch-size 8 --grad-accu 2 --max-len 64
 ```
 
 Use `python train_t2t.py --help` to see available options.

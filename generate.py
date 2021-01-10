@@ -22,7 +22,8 @@ def main(model_path: str, num_outputs: int = 5, max_length: int = 64):
             # print(len(generated_sentence))
             print(
                 tokenizer.decode(
-                    generated_sentence
+                    generated_sentence,
+                    skip_special_tokens=True
                 ) + "\n"
             )
             # print("\n")
