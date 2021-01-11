@@ -16,8 +16,8 @@ from transformers import (
 
 
 def masked_cross_entropy_loss(outputs, targets):
+    print(targets["ids"].shape, outputs.shape)
     targets, mask = targets["ids"], targets["mask"]
-    # print(outputs.shape, targets.shape)
     loss = torch.sum(
         mask.view(-1) * F.cross_entropy(
             outputs.view(-1, outputs.size(2)),
@@ -28,11 +28,25 @@ def masked_cross_entropy_loss(outputs, targets):
     return loss
 
 
+def single_token_cross_entropy_loss(outputs, targets):
+    target_ids = targets["ids"]
+    print(outputs[:, :, 333])
+    loss = F.cross_entropy(
+        outputs.view(-1, outputs.size(2)),
+        target_ids.view(-1)
+    )
+    return loss
+
+
 def optimize_sequence(ids, pad, max_len):
     # Pad to the minimum multiple of 8 to utilize tensor cores
-    max_length = math.ceil(
-        min(max_len, np.max([x.size(0) for x in ids])) / 8.
-    ) * 8
+    batch_max_len = np.max([x.size(0) for x in ids])
+    if batch_max_len > 8:
+        max_length = math.ceil(
+            min(max_len, batch_max_len) / 8.
+        ) * 8
+    else:
+        max_length = batch_max_len
     padded_ids = ids[0].new_zeros((len(ids), max_length)) + pad
     mask = ids[0].new_zeros((len(ids), max_length))
     for i, example in enumerate(ids):
@@ -62,13 +76,14 @@ def collate_batch(batch, max_len, pad=0, decode_start_token=0, is_classifier=Fal
             {"ids": target_ids, "mask": target_mask}
         )
     # is classifier
+    target_ids = torch.tensor(target_ids, dtype=torch.int64).unsqueeze(1)
     shifted_target_ids = target_ids.new_zeros(target_ids.shape[0], 1) + decode_start_token
     return (
         {
             "input_ids": source_ids, "attention_mask": src_mask,
             "decoder_input_ids": shifted_target_ids
         },
-        {"ids": target_ids[..., :1]}
+        {"ids": target_ids}
     )
 
 
@@ -89,7 +104,7 @@ class BaseConfig:
 class T5BaseModel(pl.LightningModule):
     def __init__(
             self, config: BaseConfig, model: Union[T5ForConditionalGeneration, MT5ForConditionalGeneration],
-            tokenizer: Union[T5Tokenizer, MT5Tokenizer], **kwargs):
+            tokenizer: Union[T5Tokenizer, MT5Tokenizer], is_classifier: bool = False, **kwargs):
         super().__init__()
         self.config = config
         # placeholder for pylint
@@ -101,7 +116,7 @@ class T5BaseModel(pl.LightningModule):
         self.collate_fn = partial(
             collate_batch, pad=self.model.config.decoder_start_token_id,
             decode_start_token=self.model.config.pad_token_id,
-            max_len=self.config.max_len
+            max_len=self.config.max_len, is_classifier=is_classifier
         )
         self.metrics = [
             ("acc", pl.metrics.Accuracy(compute_on_step=False))

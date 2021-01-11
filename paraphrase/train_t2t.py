@@ -2,7 +2,6 @@
 Reference: https://github.com/ramsrigouthamg/Paraphrase-any-question-with-T5-Text-To-Text-Transfer-Transformer-
 """
 import enum
-import math
 import os
 from pathlib import Path
 from typing import List
