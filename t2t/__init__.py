@@ -16,7 +16,7 @@ from transformers import (
 
 
 def masked_cross_entropy_loss(outputs, targets):
-    print(targets["ids"].shape, outputs.shape)
+    # print(targets["ids"].shape, outputs.shape)
     targets, mask = targets["ids"], targets["mask"]
     loss = torch.sum(
         mask.view(-1) * F.cross_entropy(

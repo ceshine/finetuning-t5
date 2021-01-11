@@ -1,15 +1,19 @@
-import enum
 import os
+import enum
+import math
+from itertools import chain
 from pathlib import Path
 from typing import List
 from dataclasses import dataclass, asdict
 
 import typer
-import joblib
 import torch
+import joblib
+import numpy as np
 from torch.utils.data import Dataset
 import pytorch_lightning as pl
 import pytorch_lightning_spells as pls
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer
 
 from t2t import BaseConfig, T5BaseModel, masked_cross_entropy_loss
@@ -39,19 +43,66 @@ class T5Model(T5BaseModel):
         self.context_tokens_2 = self.tokenizer.encode("premise:")[:-1]
         self.train_dataset = MNLIDataset(
             self.config.dataset, 'train_split.jbl',
-            self.context_tokens_1, self.context_tokens_2)
+            self.context_tokens_1, self.context_tokens_2)  # , tokenizer)
         print("Train dataset: ", len(self.train_dataset))
         self.valid_dataset = MNLIDataset(
             self.config.dataset, 'valid.jbl', self.context_tokens_1, self.context_tokens_2)
         print("Valid dataset: ", len(self.valid_dataset))
 
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(
+            [{
+                "params": self.model.shared.parameters(),
+                "learning_rate": self.config.learning_rate / 2,
+                "weight_decay": self.config.weight_decay / 2
+
+            }, {
+                "params": chain(
+                    self.model.decoder.block.parameters(),
+                    self.model.decoder.final_layer_norm.parameters(),
+                    self.model.lm_head.parameters()
+                ),
+                "learning_rate": self.config.learning_rate,
+                "weight_decay": self.config.weight_decay
+
+            }]
+        )
+        steps_per_epochs = math.floor(
+            len(self.train_dataset) / self.config.batch_size / self.config.grad_accu  # / self.num_gpus # dpp mode
+        )
+        print("Steps per epochs:", steps_per_epochs)
+        n_steps = steps_per_epochs * self.config.epochs
+        lr_durations = [
+            int(n_steps*0.05),
+            int(np.ceil(n_steps*0.95)) + 1
+        ]
+        break_points = [0] + list(np.cumsum(lr_durations))[:-1]
+        scheduler = {
+            'scheduler': pls.lr_schedulers.MultiStageScheduler(
+                [
+                    pls.lr_schedulers.LinearLR(optimizer, 0.01, lr_durations[0]),
+                    CosineAnnealingLR(optimizer, lr_durations[1])
+                ],
+                start_at_epochs=break_points
+            ),
+            'interval': 'step',
+            'frequency': 1,
+            'strict': True,
+        }
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler
+        }
+
 
 class MNLIDataset(Dataset):
-    def __init__(self, corpus: Corpus, file_name: str, context_tokens_1: List[int], context_tokens_2: List[int]):
+    def __init__(self, corpus: Corpus, file_name: str, context_tokens_1: List[int], context_tokens_2: List[int], tokenizer=None):
         self.premise_ids, self.hypothesis_ids, self.labels = joblib.load(
             CACHE_DIR / corpus.value / f'{file_name}')
         self.context_tokens_1 = context_tokens_1
         self.context_tokens_2 = context_tokens_2
+        # for debug
+        self.tokenizer = tokenizer
 
     def __len__(self):
         return len(self.premise_ids)
@@ -61,6 +112,10 @@ class MNLIDataset(Dataset):
             label = torch.tensor([0], dtype=torch.int64)
         else:
             label = torch.tensor(self.labels[index], dtype=torch.int64)
+        if self.tokenizer:
+            print(self.tokenizer.decode(self.context_tokens_1 + self.hypothesis_ids[index][:-1] +
+                                        self.context_tokens_2 + self.premise_ids[index]))
+            print(self.tokenizer.decode(self.labels[index]))
         return (
             torch.tensor(
                 self.context_tokens_1 + self.hypothesis_ids[index][:-1] +
@@ -112,8 +167,8 @@ def main(
         # amp_backend="apex", amp_level='O2',
         precision=16 if config.fp16 else 32,
         gpus=config.num_gpus,
-        val_check_interval=0.25,
-        gradient_clip_val=10,
+        val_check_interval=0.5,
+        gradient_clip_val=3,
         max_epochs=epochs,
         # max_steps=steps,
         callbacks=callbacks,
