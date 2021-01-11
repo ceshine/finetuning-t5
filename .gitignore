@@ -131,3 +131,5 @@ dmypy.json
 .vscode/
 cache/
 data/
+
+telegram_tokens.fish
