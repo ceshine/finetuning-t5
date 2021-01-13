@@ -15,7 +15,7 @@ from t2t import collate_batch
 def main(model_path: str, corpus: Corpus = "kaggle", split_name: str = "valid"):
     tokenizer = T5Tokenizer.from_pretrained(model_path)
     # print(tokenizer.encode("</s>"))
-    model = T5ForConditionalGeneration.from_pretrained(model_path)
+    model = T5ForConditionalGeneration.from_pretrained(model_path).cuda()
     # model.load_state_dict(torch.load(model_path))
     context_tokens_1 = tokenizer.encode("mnli hypothesis:")[:-1]
     context_tokens_2 = tokenizer.encode("premise:")[:-1]
@@ -32,13 +32,20 @@ def main(model_path: str, corpus: Corpus = "kaggle", split_name: str = "valid"):
         batch_size=8, collate_fn=collate_fn)
     preds, labels = [], []
     for input_batch, label_batch in tqdm(data_loader, ncols=100):
+        for key, val in input_batch.items():
+            input_batch[key] = val.cuda()
         outputs = model(**input_batch)
-        preds_local = torch.argmax(outputs["logits"][:, 0, :], dim=-1)
+        preds_local = torch.argmax(outputs["logits"][:, 0, :].cpu(), dim=-1)
         preds.append(preds_local.numpy())
-        labels.append(np.asarray([x[0] for x in label_batch["ids"].numpy()]))
+        labels.append(np.asarray([x[0] for x in label_batch["ids"].cpu().numpy()]))
     full_labels = np.concatenate(labels)
     full_preds = np.concatenate(preds)
+    print("Label mapping:")
+    for key in np.unique(full_labels):
+        print(f"{key}: {tokenizer.decode([key])}")
+    print("Labels:")
     print(pd.Series(full_labels).value_counts())
+    print("Predictions:")
     print(pd.Series(full_preds).value_counts())
     print("Acc: %.2f%%" % (np.mean(full_labels == full_preds) * 100))
 
