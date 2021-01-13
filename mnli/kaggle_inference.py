@@ -49,12 +49,15 @@ for input_batch, _ in data_loader:
         input_batch[key] = val.cuda()
     outputs = model(**input_batch)
     preds_local = [
-        label_tokens_dict[x] for x in torch.argmax(outputs["logits"][:, 0, :], dim=-1).cpu().numpy()
+        x for x in torch.argmax(outputs["logits"][:, 0, :], dim=-1).cpu().numpy()
     ]
     preds.append(preds_local)
 
+preds = np.concatenate(preds)
+inverse_label_dict = {key: tokenizer.decode([key]) for key in np.unique(preds)}
+
 df_sub = pd.DataFrame({
     "id": df_test.id.values,
-    "prediction": np.concatenate(preds)
+    "prediction": [inverse_label_dict[x] for x in preds]
 })
 df_sub.to_csv("submission.csv", index=False)
