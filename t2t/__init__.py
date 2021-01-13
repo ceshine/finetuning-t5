@@ -30,7 +30,7 @@ def masked_cross_entropy_loss(outputs, targets):
 
 def single_token_cross_entropy_loss(outputs, targets):
     target_ids = targets["ids"]
-    print(outputs[:, :, 333])
+    # print(outputs[:, :, 333])
     loss = F.cross_entropy(
         outputs.view(-1, outputs.size(2)),
         target_ids.view(-1)
@@ -76,7 +76,7 @@ def collate_batch(batch, max_len, pad=0, decode_start_token=0, is_classifier=Fal
             {"ids": target_ids, "mask": target_mask}
         )
     # is classifier
-    target_ids = torch.tensor(target_ids, dtype=torch.int64).unsqueeze(1)
+    target_ids = torch.stack(target_ids)
     shifted_target_ids = target_ids.new_zeros(target_ids.shape[0], 1) + decode_start_token
     return (
         {
@@ -128,7 +128,7 @@ class T5BaseModel(pl.LightningModule):
 
     def train_dataloader(self):
         return DataLoader(
-            self.train_dataset, num_workers=1, shuffle=True, drop_last=True,
+            self.train_dataset, num_workers=4, shuffle=True, drop_last=True,
             batch_size=self.config.batch_size, collate_fn=self.collate_fn)
 
     def get_progress_bar_dict(self):
@@ -139,7 +139,7 @@ class T5BaseModel(pl.LightningModule):
 
     def val_dataloader(self):
         return DataLoader(
-            self.valid_dataset, num_workers=1, shuffle=False, drop_last=False,
+            self.valid_dataset, num_workers=4, shuffle=False, drop_last=False,
             batch_size=self.config.batch_size*2, collate_fn=self.collate_fn)
 
     def validation_step(self, batch, batch_idx):

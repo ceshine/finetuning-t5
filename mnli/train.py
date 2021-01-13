@@ -16,7 +16,7 @@ import pytorch_lightning_spells as pls
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer
 
-from t2t import BaseConfig, T5BaseModel, masked_cross_entropy_loss
+from t2t import BaseConfig, T5BaseModel, single_token_cross_entropy_loss
 
 CACHE_DIR = Path("cache/")
 CACHE_DIR.mkdir(exist_ok=True, parents=True)
@@ -35,17 +35,17 @@ class T5Model(T5BaseModel):
     def __init__(self, config: Config, **kwargs):
         model = MT5ForConditionalGeneration.from_pretrained(config.base_t5_model)
         tokenizer = MT5Tokenizer.from_pretrained(config.base_t5_model)
-        super().__init__(config, model, tokenizer)
+        super().__init__(config, model, tokenizer, is_classifier=True)
         self.config = config
         # log the config values
         self.save_hyperparameters(asdict(config))
-        self.context_tokens_1 = self.tokenizer.encode("mnli hypothesis:")[:-1]
+        self.context_tokens_1 = self.tokenizer.encode("xnli hypothesis:")[:-1]
         self.context_tokens_2 = self.tokenizer.encode("premise:")[:-1]
-        self.train_dataset = MNLIDataset(
+        self.train_dataset = XNLIDataset(
             self.config.dataset, 'train_split.jbl',
             self.context_tokens_1, self.context_tokens_2)  # , tokenizer)
         print("Train dataset: ", len(self.train_dataset))
-        self.valid_dataset = MNLIDataset(
+        self.valid_dataset = XNLIDataset(
             self.config.dataset, 'valid.jbl', self.context_tokens_1, self.context_tokens_2)
         print("Valid dataset: ", len(self.valid_dataset))
 
@@ -95,7 +95,7 @@ class T5Model(T5BaseModel):
         }
 
 
-class MNLIDataset(Dataset):
+class XNLIDataset(Dataset):
     def __init__(self, corpus: Corpus, file_name: str, context_tokens_1: List[int], context_tokens_2: List[int], tokenizer=None):
         self.premise_ids, self.hypothesis_ids, self.labels = joblib.load(
             CACHE_DIR / corpus.value / f'{file_name}')
@@ -145,7 +145,7 @@ def main(
         fp16=fp16,
         weight_decay=0,
         num_gpus=num_gpus,
-        loss_fn=masked_cross_entropy_loss
+        loss_fn=single_token_cross_entropy_loss
     )
     # print(config)
 
@@ -167,7 +167,7 @@ def main(
         # amp_backend="apex", amp_level='O2',
         precision=16 if config.fp16 else 32,
         gpus=config.num_gpus,
-        val_check_interval=0.5,
+        # val_check_interval=1,
         gradient_clip_val=3,
         max_epochs=epochs,
         # max_steps=steps,
@@ -187,6 +187,7 @@ def main(
     model_name = config.base_t5_model.split("/")[-1]
 
     assert isinstance(callbacks[0], pl.callbacks.ModelCheckpoint)
+    del trainer, pl_module
     print(callbacks[0].best_model_path)
     pl_module = T5Model.load_from_checkpoint(
         callbacks[0].best_model_path,

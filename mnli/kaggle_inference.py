@@ -7,7 +7,7 @@ from transformers import MT5ForConditionalGeneration, MT5Tokenizer
 from torch.utils.data import DataLoader
 
 from preprocess.tokenize_dataset import process_file
-from train import MNLIDataset
+from train import XNLIDataset
 from t2t import collate_batch
 
 df_test = pd.read_csv("/kaggle/input/contradictory-my-dear-watson/test.csv")
@@ -22,7 +22,7 @@ label_tokens_dict = {
 }
 
 
-class InferenceDataset(MNLIDataset):
+class InferenceDataset(XNLIDataset):
     def __init__(self, premise_ids, hypothesis_ids):
         self.labels = None
         self.premise_ids = premise_ids

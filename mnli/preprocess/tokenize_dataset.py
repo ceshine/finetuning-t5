@@ -3,19 +3,20 @@ from pathlib import Path
 
 import typer
 import joblib
-from tqdm import tqdm
+import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from transformers import MT5Tokenizer
 
 DATA_PATH = Path("data/")
 CACHE_PATH = Path("cache/")
 CACHE_PATH.mkdir(exist_ok=True, parents=True)
 
-label_dict = {
-    0: "entailment",
-    1: "neutral",
-    2: "contradiction"
-}
+# label_dict = {
+#     0: "entailment",
+#     1: "neutral",
+#     2: "contradiction"
+# }
 
 
 class Dataset(enum.Enum):
@@ -26,10 +27,9 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
     premise_ids = []
     hypothesis_ids = []
     if "label" in data.columns:
-        label_token_dict = {key: tokenizer.encode(val) for key, val in label_dict.items()}
-        # assert all((len(x) == 2 for x in label_dict.values()))
-        # print(label_dict)
-        labels = data.label.apply(lambda x: label_token_dict[x]).values
+        label_dict = {val: tokenizer.encode(str(val)) for val in data.label.unique()}
+        assert all((len(x) == 2 for x in label_dict.values()))
+        labels = np.asarray(data.label.apply(lambda x: label_dict[x]).tolist())[:, :1]
     else:
         labels = None
     for i in tqdm(range(0, len(data), batch_size), ncols=100):

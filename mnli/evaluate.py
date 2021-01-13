@@ -8,7 +8,7 @@ from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from torch.utils.data import DataLoader
 
-from train import MNLIDataset, Corpus
+from train import XNLIDataset, Corpus
 from t2t import collate_batch
 
 
@@ -24,7 +24,7 @@ def main(model_path: str, corpus: Corpus = "kaggle", split_name: str = "valid"):
         decode_start_token=model.config.pad_token_id,
         max_len=64, is_classifier=False
     )
-    dataset = MNLIDataset(
+    dataset = XNLIDataset(
         corpus, split_name + ".jbl",
         context_tokens_1, context_tokens_2)
     data_loader = DataLoader(
