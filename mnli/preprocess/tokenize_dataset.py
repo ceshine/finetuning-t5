@@ -50,6 +50,7 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
 
 
 def main(dataset: Dataset, tokenizer_name: str = "google/mt5-small", batch_size: int = 1024):
+    (DATA_PATH / dataset.value).mkdir(parents=True, exist_ok=True)
     tokenizer = MT5Tokenizer.from_pretrained(tokenizer_name)
     for datafile in ("train_split.csv", "valid.csv", "test.csv"):
         if not (DATA_PATH / dataset.value / datafile).exists():
