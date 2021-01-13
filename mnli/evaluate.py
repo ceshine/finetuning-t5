@@ -22,7 +22,7 @@ def main(model_path: str, corpus: Corpus = "kaggle", split_name: str = "valid"):
     collate_fn = partial(
         collate_batch, pad=model.config.decoder_start_token_id,
         decode_start_token=model.config.pad_token_id,
-        max_len=64, is_classifier=False
+        max_len=64, is_classifier=True
     )
     dataset = XNLIDataset(
         corpus, split_name + ".jbl",
