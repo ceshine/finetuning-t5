@@ -50,23 +50,39 @@ class T5Model(T5BaseModel):
         print("Valid dataset: ", len(self.valid_dataset))
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(
-            [{
-                "params": self.model.shared.parameters(),
-                "learning_rate": self.config.learning_rate / 2,
-                "weight_decay": self.config.weight_decay / 2
+        pls.utils.set_trainable(self.model.encoder.block, False)
+        pls.utils.set_trainable(self.model.encoder.final_layer_norm, False)
+        # pls.utils.set_trainable(self.model.decoder.block, False)
+        # pls.utils.set_trainable(self.model.decoder.final_layer_norm, False)
+        pls.utils.set_trainable(self.model.shared, False)
+        optimizer = torch.optim.AdamW(
+            [
+                # {
+                #     #     "params": chain(
+                #     #         self.model.encoder.block.parameters(),
+                #     #         self.model.encoder.final_layer_norm.parameters()
+                #     #     ),
+                #     # "params": self.model.encoder.parameters(),
+                #     "params": self.model.shared.parameters(),
+                #     "learning_rate": self.config.learning_rate / 4,
+                #     "weight_decay": self.config.weight_decay / 4
+                # },
+                {
+                    "params": chain(
+                        self.model.decoder.block.parameters(),
+                        self.model.decoder.final_layer_norm.parameters(),
+                        self.model.lm_head.parameters()
+                    ),
+                    # "params": self.model.parameters(),
+                    "learning_rate": self.config.learning_rate,
+                    "weight_decay": self.config.weight_decay
 
-            }, {
-                "params": chain(
-                    self.model.decoder.block.parameters(),
-                    self.model.decoder.final_layer_norm.parameters(),
-                    self.model.lm_head.parameters()
-                ),
-                "learning_rate": self.config.learning_rate,
-                "weight_decay": self.config.weight_decay
-
-            }]
+                }
+            ]
         )
+        print("Optimizer parameter count: {:,d}".format(np.sum([
+            pls.utils.count_parameters(group["params"]) for group in optimizer.param_groups
+        ])))
         steps_per_epochs = math.floor(
             len(self.train_dataset) / self.config.batch_size / self.config.grad_accu  # / self.num_gpus # dpp mode
         )
@@ -164,7 +180,7 @@ def main(
     ]
     trainer = pl.Trainer(
         accelerator='dp' if num_gpus > 1 else None,
-        # amp_backend="apex", amp_level='O2',
+        # amp_backend="apex", amp_level='O1',
         precision=16 if config.fp16 else 32,
         gpus=config.num_gpus,
         # val_check_interval=1,
