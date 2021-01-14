@@ -1,4 +1,5 @@
 import os
+import gc
 import enum
 import math
 from itertools import chain
@@ -204,6 +205,7 @@ def main(
 
     assert isinstance(callbacks[0], pl.callbacks.ModelCheckpoint)
     del trainer, pl_module
+    gc.collect()
     print(callbacks[0].best_model_path)
     pl_module = T5Model.load_from_checkpoint(
         callbacks[0].best_model_path,
