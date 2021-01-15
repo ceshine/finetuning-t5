@@ -204,7 +204,7 @@ def main(
     model_name = config.base_t5_model.split("/")[-1]
 
     assert isinstance(callbacks[0], pl.callbacks.ModelCheckpoint)
-    pl_module.load_state_dict(torch.load("callbacks[0].best_model_path")["state_dict"])
+    pl_module.load_state_dict(torch.load(callbacks[0].best_model_path)["state_dict"])
     del trainer
     gc.collect()
     # print(callbacks[0].best_model_path)
