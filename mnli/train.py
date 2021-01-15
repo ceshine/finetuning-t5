@@ -18,13 +18,10 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import MT5ForConditionalGeneration, MT5Tokenizer, T5ForConditionalGeneration, T5Tokenizer
 
 from t2t import BaseConfig, T5BaseModel, single_token_cross_entropy_loss
+from preprocess.tokenize_dataset import Corpus
 
 CACHE_DIR = Path("cache/")
 CACHE_DIR.mkdir(exist_ok=True, parents=True)
-
-
-class Corpus(enum.Enum):
-    KAGGLE = "kaggle"
 
 
 @dataclass

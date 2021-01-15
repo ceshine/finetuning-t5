@@ -19,7 +19,7 @@ CACHE_PATH.mkdir(exist_ok=True, parents=True)
 # }
 
 
-class Dataset(enum.Enum):
+class Corpus(enum.Enum):
     KAGGLE = "kaggle"
     MNLI = "multinli"
 
@@ -50,8 +50,8 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
     return premise_ids, hypothesis_ids, labels
 
 
-def main(dataset: Dataset, tokenizer_name: str = "google/mt5-small", batch_size: int = 1024):
-    (DATA_PATH / dataset.value).mkdir(parents=True, exist_ok=True)
+def main(dataset: Corpus, tokenizer_name: str = "google/mt5-small", batch_size: int = 1024):
+    (CACHE_PATH / dataset.value).mkdir(parents=True, exist_ok=True)
     if "mt5" in tokenizer_name:
         tokenizer = MT5Tokenizer.from_pretrained(tokenizer_name)
     else:
