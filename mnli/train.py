@@ -15,7 +15,7 @@ from torch.utils.data import Dataset
 import pytorch_lightning as pl
 import pytorch_lightning_spells as pls
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from transformers import MT5ForConditionalGeneration, MT5Tokenizer
+from transformers import MT5ForConditionalGeneration, MT5Tokenizer, T5ForConditionalGeneration, T5Tokenizer
 
 from t2t import BaseConfig, T5BaseModel, single_token_cross_entropy_loss
 
@@ -34,8 +34,12 @@ class Config(BaseConfig):
 
 class T5Model(T5BaseModel):
     def __init__(self, config: Config, **kwargs):
-        model = MT5ForConditionalGeneration.from_pretrained(config.base_t5_model)
-        tokenizer = MT5Tokenizer.from_pretrained(config.base_t5_model)
+        if "mt5" in config.base_t5_model:
+            model = MT5ForConditionalGeneration.from_pretrained(config.base_t5_model)
+            tokenizer = MT5Tokenizer.from_pretrained(config.base_t5_model)
+        else:
+            model = T5ForConditionalGeneration.from_pretrained(config.base_t5_model)
+            tokenizer = T5Tokenizer.from_pretrained(config.base_t5_model)
         super().__init__(config, model, tokenizer, is_classifier=True)
         self.config = config
         # log the config values
