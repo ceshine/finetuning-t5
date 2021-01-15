@@ -113,11 +113,14 @@ class T5Model(T5BaseModel):
 
 
 class XNLIDataset(Dataset):
-    def __init__(self, corpus: Corpus, file_name: str, context_tokens_1: List[int], context_tokens_2: List[int], tokenizer=None):
+    def __init__(
+            self, corpus: Corpus, file_name: str, context_tokens_1: List[int], context_tokens_2: List[int],
+            max_len: int = 128, tokenizer=None):
         self.premise_ids, self.hypothesis_ids, self.labels = joblib.load(
             CACHE_DIR / corpus.value / f'{file_name}')
         self.context_tokens_1 = context_tokens_1
         self.context_tokens_2 = context_tokens_2
+        self.max_len = max_len  # max length for premise and hypothesis
         # for debug
         self.tokenizer = tokenizer
 
@@ -129,14 +132,16 @@ class XNLIDataset(Dataset):
             label = torch.tensor([0], dtype=torch.int64)
         else:
             label = torch.tensor(self.labels[index], dtype=torch.int64)
+        premise_length = min(self.max_len, len(self.premise_ids[index]))
+        hypothesis_length = min(self.max_len-1, len(self.hypothesis_ids[index]) - 1)
         if self.tokenizer:
-            print(self.tokenizer.decode(self.context_tokens_1 + self.hypothesis_ids[index][:-1] +
-                                        self.context_tokens_2 + self.premise_ids[index]))
+            print(self.tokenizer.decode(self.context_tokens_1 + self.hypothesis_ids[index][:hypothesis_length] +
+                                        self.context_tokens_2 + self.premise_ids[index][:premise_length]))
             print(self.tokenizer.decode(self.labels[index]))
         return (
             torch.tensor(
-                self.context_tokens_1 + self.hypothesis_ids[index][:-1] +
-                self.context_tokens_2 + self.premise_ids[index],
+                self.context_tokens_1 + self.hypothesis_ids[index][:-1][:hypothesis_length] +
+                self.context_tokens_2 + self.premise_ids[index][:premise_length],
                 dtype=torch.int64
             ),
             label
