@@ -4,7 +4,7 @@ import enum
 import math
 from itertools import chain
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass, asdict
 
 import typer
@@ -158,7 +158,8 @@ def main(
     epochs: int = 5, fp16: bool = False,
     dataset: Corpus = "kaggle", batch_size: int = 16,
     max_len: int = 64, grad_accu: int = 1,
-    num_gpus: int = 1, disable_progress_bar: bool = False
+    num_gpus: int = 1, disable_progress_bar: bool = False,
+    valid_frequency: Optional[float] = None
 ):
     pl.seed_everything(int(os.environ.get("SEED", 738)))
     config = Config(
@@ -194,7 +195,7 @@ def main(
         # amp_backend="apex", amp_level='O1',
         precision=16 if config.fp16 else 32,
         gpus=config.num_gpus,
-        # val_check_interval=1,
+        val_check_interval=valid_frequency if valid_frequency else 1.0,
         gradient_clip_val=3,
         max_epochs=epochs,
         # max_steps=steps,
