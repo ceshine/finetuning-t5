@@ -211,6 +211,8 @@ def main(
         callbacks[0].best_model_path,
         config=config
     )
+    print("Saving the model...")
+    gc.collect()
     pl_module.model.save_pretrained(CACHE_DIR / f"{model_name}_best")
     pl_module.tokenizer.save_pretrained(CACHE_DIR / f"{model_name}_best")
     print("Best model saved")
