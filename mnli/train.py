@@ -148,7 +148,7 @@ def main(
     epochs: int = 5, fp16: bool = False,
     dataset: Corpus = "kaggle", batch_size: int = 16,
     max_len: int = 64, grad_accu: int = 1,
-    num_gpus: int = 1
+    num_gpus: int = 1, disable_progress_bar: bool = False
 ):
     pl.seed_everything(int(os.environ.get("SEED", 738)))
     config = Config(
@@ -196,7 +196,8 @@ def main(
             pls.loggers.ScreenLogger(),
             # pl.loggers.WandbLogger(project="t5-paraphrase")
         ],
-        log_every_n_steps=100
+        log_every_n_steps=100,
+        progress_bar_refresh_rate=0 if disable_progress_bar else 2
     )
 
     trainer.fit(pl_module)
@@ -207,13 +208,6 @@ def main(
     pl_module.load_state_dict(torch.load(callbacks[0].best_model_path)["state_dict"])
     del trainer
     gc.collect()
-    # print(callbacks[0].best_model_path)
-    # pl_module = T5Model.load_from_checkpoint(
-    #     callbacks[0].best_model_path,
-    #     config=config
-    # )
-    # print("Saving the model...")
-    # gc.collect()
     pl_module.model.save_pretrained(CACHE_DIR / f"{model_name}_best")
     pl_module.tokenizer.save_pretrained(CACHE_DIR / f"{model_name}_best")
     print("Best model saved")
