@@ -21,6 +21,7 @@ CACHE_PATH.mkdir(exist_ok=True, parents=True)
 
 class Dataset(enum.Enum):
     KAGGLE = "kaggle"
+    MNLI = "multinli"
 
 
 def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
@@ -43,7 +44,7 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
         # tokenize targets
         hypothesis_ids.extend(
             tokenizer.batch_encode_plus(
-                batch["hypothesis"].values, return_attention_mask=False
+                batch["hypothesis"].values.tolist(), return_attention_mask=False
             )["input_ids"]
         )
     return premise_ids, hypothesis_ids, labels
@@ -52,7 +53,7 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
 def main(dataset: Dataset, tokenizer_name: str = "google/mt5-small", batch_size: int = 1024):
     (DATA_PATH / dataset.value).mkdir(parents=True, exist_ok=True)
     tokenizer = MT5Tokenizer.from_pretrained(tokenizer_name)
-    for datafile in ("train_split.csv", "valid.csv", "test.csv"):
+    for datafile in ("train_split.csv", "valid.csv", "test.csv", "test_matched.csv", "test_mismatched.csv"):
         if not (DATA_PATH / dataset.value / datafile).exists():
             continue
         print(datafile)
