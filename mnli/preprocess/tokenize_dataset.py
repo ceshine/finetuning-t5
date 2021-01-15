@@ -6,7 +6,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from transformers import MT5Tokenizer
+from transformers import MT5Tokenizer, T5Tokenizer
 
 DATA_PATH = Path("data/")
 CACHE_PATH = Path("cache/")
@@ -29,8 +29,8 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
     hypothesis_ids = []
     if "label" in data.columns:
         label_dict = {val: tokenizer.encode(str(val)) for val in data.label.unique()}
-        assert all((len(x) == 2 for x in label_dict.values()))
-        labels = np.asarray(data.label.apply(lambda x: label_dict[x]).tolist())[:, :1]
+        assert len(set([x[0] for x in label_dict.values()])) == data.label.nunique(), label_dict.values()
+        labels = np.asarray(data.label.apply(lambda x: label_dict[x][:1]).tolist())
     else:
         labels = None
     for i in tqdm(range(0, len(data), batch_size), ncols=100):
@@ -52,7 +52,10 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
 
 def main(dataset: Dataset, tokenizer_name: str = "google/mt5-small", batch_size: int = 1024):
     (DATA_PATH / dataset.value).mkdir(parents=True, exist_ok=True)
-    tokenizer = MT5Tokenizer.from_pretrained(tokenizer_name)
+    if "mt5" in tokenizer_name:
+        tokenizer = MT5Tokenizer.from_pretrained(tokenizer_name)
+    else:
+        tokenizer = T5Tokenizer.from_pretrained(tokenizer_name)
     for datafile in ("train_split.csv", "valid.csv", "test.csv", "test_matched.csv", "test_mismatched.csv"):
         if not (DATA_PATH / dataset.value / datafile).exists():
             continue
