@@ -204,15 +204,16 @@ def main(
     model_name = config.base_t5_model.split("/")[-1]
 
     assert isinstance(callbacks[0], pl.callbacks.ModelCheckpoint)
-    del trainer, pl_module
+    pl_module.load_state_dict(torch.load("callbacks[0].best_model_path")["state_dict"])
+    del trainer
     gc.collect()
-    print(callbacks[0].best_model_path)
-    pl_module = T5Model.load_from_checkpoint(
-        callbacks[0].best_model_path,
-        config=config
-    )
-    print("Saving the model...")
-    gc.collect()
+    # print(callbacks[0].best_model_path)
+    # pl_module = T5Model.load_from_checkpoint(
+    #     callbacks[0].best_model_path,
+    #     config=config
+    # )
+    # print("Saving the model...")
+    # gc.collect()
     pl_module.model.save_pretrained(CACHE_DIR / f"{model_name}_best")
     pl_module.tokenizer.save_pretrained(CACHE_DIR / f"{model_name}_best")
     print("Best model saved")
