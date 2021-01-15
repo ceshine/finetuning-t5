@@ -48,10 +48,14 @@ class T5Model(T5BaseModel):
         self.context_tokens_2 = self.tokenizer.encode("premise:")[:-1]
         self.train_dataset = XNLIDataset(
             self.config.dataset, 'train_split.jbl',
-            self.context_tokens_1, self.context_tokens_2)  # , tokenizer)
+            self.context_tokens_1, self.context_tokens_2,
+            max_len=config.max_len // 2
+        )  # , tokenizer)
         print("Train dataset: ", len(self.train_dataset))
         self.valid_dataset = XNLIDataset(
-            self.config.dataset, 'valid.jbl', self.context_tokens_1, self.context_tokens_2)
+            self.config.dataset, 'valid.jbl', self.context_tokens_1, self.context_tokens_2,
+            max_len=config.max_len // 2
+        )
         print("Valid dataset: ", len(self.valid_dataset))
 
     def configure_optimizers(self):
