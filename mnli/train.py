@@ -1,6 +1,5 @@
 import os
 import gc
-import enum
 import math
 from itertools import chain
 from pathlib import Path
