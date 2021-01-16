@@ -26,6 +26,7 @@ CACHE_DIR.mkdir(exist_ok=True, parents=True)
 @dataclass
 class Config(BaseConfig):
     dataset: Corpus = Corpus.KAGGLE
+    decoder_only: bool = True
 
 
 class T5Model(T5BaseModel):
@@ -33,6 +34,8 @@ class T5Model(T5BaseModel):
         if "mt5" in config.base_t5_model:
             model = MT5ForConditionalGeneration.from_pretrained(config.base_t5_model)
             tokenizer = MT5Tokenizer.from_pretrained(config.base_t5_model)
+            # tie the weights
+            model.lm_head.weight = model.shared.weight
         else:
             model = T5ForConditionalGeneration.from_pretrained(config.base_t5_model)
             tokenizer = T5Tokenizer.from_pretrained(config.base_t5_model)
@@ -55,36 +58,50 @@ class T5Model(T5BaseModel):
         print("Valid dataset: ", len(self.valid_dataset))
 
     def configure_optimizers(self):
-        pls.utils.set_trainable(self.model.encoder.block, False)
-        pls.utils.set_trainable(self.model.encoder.final_layer_norm, False)
-        # pls.utils.set_trainable(self.model.decoder.block, False)
-        # pls.utils.set_trainable(self.model.decoder.final_layer_norm, False)
-        pls.utils.set_trainable(self.model.shared, False)
-        optimizer = torch.optim.AdamW(
-            [
-                # {
-                #     #     "params": chain(
-                #     #         self.model.encoder.block.parameters(),
-                #     #         self.model.encoder.final_layer_norm.parameters()
-                #     #     ),
-                #     # "params": self.model.encoder.parameters(),
-                #     "params": self.model.shared.parameters(),
-                #     "learning_rate": self.config.learning_rate / 4,
-                #     "weight_decay": self.config.weight_decay / 4
-                # },
-                {
-                    "params": chain(
-                        self.model.decoder.block.parameters(),
-                        self.model.decoder.final_layer_norm.parameters(),
-                        self.model.lm_head.parameters()
-                    ),
-                    # "params": self.model.parameters(),
-                    "learning_rate": self.config.learning_rate,
-                    "weight_decay": self.config.weight_decay
+        if self.config.decoder_only:
+            # pls.utils.set_trainable(self.model.encoder.block, False)
+            # pls.utils.set_trainable(self.model.encoder.final_layer_norm, False)
+            pls.utils.set_trainable(self.model.encoder, False)
+            optimizer = torch.optim.AdamW(
+                [
+                    {
+                        "params": chain(
+                            self.model.decoder.block.parameters(),
+                            self.model.decoder.final_layer_norm.parameters(),
+                            self.model.lm_head.parameters()
+                        ),
+                        "learning_rate": self.config.learning_rate,
+                        "weight_decay": self.config.weight_decay
 
-                }
-            ]
-        )
+                    }
+                ]
+            )
+        else:
+            # make sure the weights are tied
+            assert self.model.lm_head.weight is self.model.shared.weight, (
+                self.model.shared.weight - self.model.lm_head.weight).sum()
+            optimizer = torch.optim.AdamW(
+                [
+                    {
+                        "params": chain(
+                            self.model.encoder.block.parameters(),
+                            self.model.encoder.final_layer_norm.parameters()
+                        ),
+                        "learning_rate": self.config.learning_rate / 2,
+                        "weight_decay": self.config.weight_decay / 2,
+                    },
+                    {
+                        "params": chain(
+                            self.model.decoder.block.parameters(),
+                            self.model.decoder.final_layer_norm.parameters(),
+                            self.model.lm_head.parameters()
+                        ),
+                        "learning_rate": self.config.learning_rate,
+                        "weight_decay": self.config.weight_decay
+
+                    }
+                ]
+            )
         print("Optimizer parameter count: {:,d}".format(np.sum([
             pls.utils.count_parameters(group["params"]) for group in optimizer.param_groups
         ])))
@@ -158,7 +175,8 @@ def main(
     dataset: Corpus = "kaggle", batch_size: int = 16,
     max_len: int = 64, grad_accu: int = 1,
     num_gpus: int = 1, disable_progress_bar: bool = False,
-    valid_frequency: Optional[float] = None
+    valid_frequency: Optional[float] = None,
+    full_model: bool = False
 ):
     pl.seed_everything(int(os.environ.get("SEED", 738)))
     config = Config(
@@ -172,7 +190,8 @@ def main(
         fp16=fp16,
         weight_decay=0,
         num_gpus=num_gpus,
-        loss_fn=single_token_cross_entropy_loss
+        loss_fn=single_token_cross_entropy_loss,
+        decoder_only=not full_model
     )
     # print(config)
 
