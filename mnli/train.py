@@ -35,7 +35,7 @@ class T5Model(T5BaseModel):
             model = MT5ForConditionalGeneration.from_pretrained(config.base_t5_model)
             tokenizer = MT5Tokenizer.from_pretrained(config.base_t5_model)
             # tie the weights
-            model.lm_head.weight = model.shared.weight
+            # model.lm_head.weight = model.shared.weight
         else:
             model = T5ForConditionalGeneration.from_pretrained(config.base_t5_model)
             tokenizer = T5Tokenizer.from_pretrained(config.base_t5_model)
@@ -59,9 +59,10 @@ class T5Model(T5BaseModel):
 
     def configure_optimizers(self):
         if self.config.decoder_only:
-            # pls.utils.set_trainable(self.model.encoder.block, False)
-            # pls.utils.set_trainable(self.model.encoder.final_layer_norm, False)
-            pls.utils.set_trainable(self.model.encoder, False)
+            pls.utils.set_trainable(self.model.encoder.block, False)
+            pls.utils.set_trainable(self.model.encoder.final_layer_norm, False)
+            if not (self.model.lm_head.weight is self.model.shared.weight):
+                pls.utils.set_trainable(self.model.shared, False)
             optimizer = torch.optim.AdamW(
                 [
                     {
@@ -77,15 +78,18 @@ class T5Model(T5BaseModel):
                 ]
             )
         else:
-            # make sure the weights are tied
-            assert self.model.lm_head.weight is self.model.shared.weight, (
-                self.model.shared.weight - self.model.lm_head.weight).sum()
+            # # make sure the weights are tied
+            # assert self.model.lm_head.weight is self.model.shared.weight, (
+            #     self.model.shared.weight - self.model.lm_head.weight).sum()
             optimizer = torch.optim.AdamW(
                 [
                     {
-                        "params": chain(
-                            self.model.encoder.block.parameters(),
-                            self.model.encoder.final_layer_norm.parameters()
+                        "params": (
+                            chain(
+                                self.model.encoder.block.parameters(),
+                                self.model.encoder.final_layer_norm.parameters()
+                            ) if (self.model.lm_head.weight is self.model.shared.weight) else
+                            self.model.encoder.parameters()
                         ),
                         "learning_rate": self.config.learning_rate / 2,
                         "weight_decay": self.config.weight_decay / 2,
