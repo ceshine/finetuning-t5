@@ -13,7 +13,7 @@ from t2t import collate_batch
 df_test = pd.read_csv("/kaggle/input/contradictory-my-dear-watson/test.csv")
 
 tokenizer = MT5Tokenizer.from_pretrained("/kaggle/input/nli-mt5-base")
-model = MT5ForConditionalGeneration.from_pretrained("/kaggle/input/nli-mt5-base").cuda()
+model = MT5ForConditionalGeneration.from_pretrained("/kaggle/input/nli-mt5-base").cuda().eval()
 
 label_tokens_dict = {
     tokens[0]: idx for idx, tokens in enumerate(tokenizer.batch_encode_plus(

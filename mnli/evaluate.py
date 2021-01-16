@@ -20,11 +20,11 @@ def main(
     if "mt5" in Path(model_path).stem:
         tokenizer = MT5Tokenizer.from_pretrained(model_path)
         # print(tokenizer.encode("</s>"))
-        model = MT5ForConditionalGeneration.from_pretrained(model_path).cuda()
+        model = MT5ForConditionalGeneration.from_pretrained(model_path).cuda().eval()
     else:
         tokenizer = T5Tokenizer.from_pretrained(model_path)
         # print(tokenizer.encode("</s>"))
-        model = T5ForConditionalGeneration.from_pretrained(model_path).cuda()
+        model = T5ForConditionalGeneration.from_pretrained(model_path).cuda().eval()
     # model.load_state_dict(torch.load(model_path))
     context_tokens_1 = tokenizer.encode("mnli hypothesis:")[:-1]
     context_tokens_2 = tokenizer.encode("premise:")[:-1]
