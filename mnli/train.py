@@ -61,16 +61,23 @@ class T5Model(T5BaseModel):
         if self.config.decoder_only:
             pls.utils.set_trainable(self.model.encoder.block, False)
             pls.utils.set_trainable(self.model.encoder.final_layer_norm, False)
+            params = self.model.lm_head.parameters()
             if not (self.model.lm_head.weight is self.model.shared.weight):
+                # weight is not shared
                 pls.utils.set_trainable(self.model.shared, False)
+                params = chain(
+                    self.model.decoder.block.parameters(),
+                    self.model.decoder.final_layer_norm.parameters(),
+                    self.model.lm_head.parameters()
+                )
+            else:
+                pls.utils.set_trainable(self.model.decoder.block, False)
+                pls.utils.set_trainable(self.model.decoder.final_layer_norm, False)
+                params = self.model.lm_head.parameters()
             optimizer = torch.optim.AdamW(
                 [
                     {
-                        "params": chain(
-                            self.model.decoder.block.parameters(),
-                            self.model.decoder.final_layer_norm.parameters(),
-                            self.model.lm_head.parameters()
-                        ),
+                        "params": params,
                         "learning_rate": self.config.learning_rate,
                         "weight_decay": self.config.weight_decay
 
