@@ -6,7 +6,10 @@ import torch
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from transformers import MT5ForConditionalGeneration, MT5Tokenizer, T5ForConditionalGeneration, T5Tokenizer
+from transformers import (
+    MT5ForConditionalGeneration, MT5Tokenizer, MT5Config,
+    T5ForConditionalGeneration, T5Tokenizer, T5Config
+)
 from torch.utils.data import DataLoader
 
 from preprocess.tokenize_dataset import Corpus
@@ -20,11 +23,18 @@ def main(
     if "mt5" in Path(model_path).stem:
         tokenizer = MT5Tokenizer.from_pretrained(model_path)
         # print(tokenizer.encode("</s>"))
-        model = MT5ForConditionalGeneration.from_pretrained(model_path).cuda().eval()
+        model = MT5ForConditionalGeneration(
+            MT5Config.from_pretrained(model_path)
+        ).eval()
     else:
         tokenizer = T5Tokenizer.from_pretrained(model_path)
         # print(tokenizer.encode("</s>"))
-        model = T5ForConditionalGeneration.from_pretrained(model_path).cuda().eval()
+        model = T5ForConditionalGeneration(
+            T5Config.from_pretrained(model_path)
+        ).eval()
+    model.lm_head = torch.nn.Linear(model.lm_head.in_features, 3, bias=False)
+    model.load_state_dict(torch.load(Path(model_path) / "pytorch_model.bin"))
+    model = model.cuda()
     # model.load_state_dict(torch.load(model_path))
     context_tokens_1 = tokenizer.encode("mnli hypothesis:")[:-1]
     context_tokens_2 = tokenizer.encode("premise:")[:-1]
@@ -49,9 +59,9 @@ def main(
         labels.append(np.asarray([x[0] for x in label_batch["ids"].cpu().numpy()]))
     full_labels = np.concatenate(labels)
     full_preds = np.concatenate(preds)
-    print("Label mapping:")
-    for key in np.unique(full_labels):
-        print(f"{key}: {tokenizer.decode([key])}")
+    # print("Label mapping:")
+    # for key in np.unique(full_labels):
+    #     print(f"{key}: {tokenizer.decode([key])}")
     print("Labels:")
     print(pd.Series(full_labels).value_counts())
     print("Predictions:")
