@@ -27,6 +27,7 @@ CACHE_DIR.mkdir(exist_ok=True, parents=True)
 class Config(BaseConfig):
     dataset: Corpus = Corpus.KAGGLE
     decoder_only: bool = True
+    num_classes: int = 3
 
 
 class T5Model(T5BaseModel):
@@ -39,6 +40,8 @@ class T5Model(T5BaseModel):
         else:
             model = T5ForConditionalGeneration.from_pretrained(config.base_t5_model)
             tokenizer = T5Tokenizer.from_pretrained(config.base_t5_model)
+        # replace the lm_head
+        model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
         super().__init__(config, model, tokenizer, is_classifier=True)
         self.config = config
         # log the config values

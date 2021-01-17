@@ -28,9 +28,9 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
     premise_ids = []
     hypothesis_ids = []
     if "label" in data.columns:
-        label_dict = {val: tokenizer.encode(str(val)) for val in data.label.unique()}
-        assert len(set([x[0] for x in label_dict.values()])) == data.label.nunique(), label_dict.values()
-        labels = np.asarray(data.label.apply(lambda x: label_dict[x][:1]).tolist())
+        assert data.label.max() == data.label.nunique() - 1
+        assert data.label.min() == 0
+        labels = data.label.astype("int")[:, np.newaxis]
     else:
         labels = None
     for i in tqdm(range(0, len(data), batch_size), ncols=100):
@@ -41,7 +41,7 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
                 batch["premise"].values, return_attention_mask=False
             )["input_ids"]
         )
-        # tokenize targets
+        # tokenize hypothesis
         hypothesis_ids.extend(
             tokenizer.batch_encode_plus(
                 batch["hypothesis"].values.tolist(), return_attention_mask=False
