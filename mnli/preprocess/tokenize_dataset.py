@@ -30,7 +30,7 @@ def process_file(data: pd.DataFrame, tokenizer: MT5Tokenizer, batch_size: int):
     if "label" in data.columns:
         assert data.label.max() == data.label.nunique() - 1
         assert data.label.min() == 0
-        labels = data.label.astype("int")[:, np.newaxis]
+        labels = data.label.astype("int").values[:, np.newaxis]
     else:
         labels = None
     for i in tqdm(range(0, len(data), batch_size), ncols=100):
