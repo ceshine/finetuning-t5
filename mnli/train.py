@@ -14,7 +14,10 @@ from torch.utils.data import Dataset
 import pytorch_lightning as pl
 import pytorch_lightning_spells as pls
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from transformers import MT5ForConditionalGeneration, MT5Tokenizer, T5ForConditionalGeneration, T5Tokenizer
+from transformers import (
+    MT5ForConditionalGeneration, MT5Tokenizer, T5ForConditionalGeneration, T5Tokenizer,
+    MT5Config, T5Config
+)
 
 from t2t import BaseConfig, T5BaseModel, single_token_cross_entropy_loss
 from preprocess.tokenize_dataset import Corpus
@@ -30,18 +33,30 @@ class Config(BaseConfig):
     num_classes: int = 3
 
 
+def load_model(model_class, model_config_class, model_path):
+    try:
+        model = model_class.from_pretrained(model_path)
+        # replace the lm_head
+        model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
+    except RuntimeError:
+        model = model_class(
+            model_config_class.from_pretrained(model_path)
+        )
+        model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
+        model.load_state_dict(torch.load(Path(model_path) / "pytorch_model.bin"))
+    return model
+
+
 class T5Model(T5BaseModel):
     def __init__(self, config: Config, **kwargs):
         if "mt5" in config.base_t5_model:
-            model = MT5ForConditionalGeneration.from_pretrained(config.base_t5_model)
             tokenizer = MT5Tokenizer.from_pretrained(config.base_t5_model)
+            model = load_model(MT5ForConditionalGeneration, MT5Config, config.base_t5_model)
             # tie the weights
             # model.lm_head.weight = model.shared.weight
         else:
-            model = T5ForConditionalGeneration.from_pretrained(config.base_t5_model)
             tokenizer = T5Tokenizer.from_pretrained(config.base_t5_model)
-        # replace the lm_head
-        model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
+            model = load_model(T5ForConditionalGeneration, T5Config, config.base_t5_model)
         super().__init__(config, model, tokenizer, is_classifier=True)
         self.config = config
         # log the config values
