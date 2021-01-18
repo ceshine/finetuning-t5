@@ -33,7 +33,8 @@ class Config(BaseConfig):
     num_classes: int = 3
 
 
-def load_model(model_class, model_config_class, model_path):
+def load_model(model_class, model_config_class, config):
+    model_path = config.base_t5_model
     try:
         model = model_class.from_pretrained(model_path)
         # replace the lm_head
@@ -51,12 +52,12 @@ class T5Model(T5BaseModel):
     def __init__(self, config: Config, **kwargs):
         if "mt5" in config.base_t5_model:
             tokenizer = MT5Tokenizer.from_pretrained(config.base_t5_model)
-            model = load_model(MT5ForConditionalGeneration, MT5Config, config.base_t5_model)
+            model = load_model(MT5ForConditionalGeneration, MT5Config, config)
             # tie the weights
             # model.lm_head.weight = model.shared.weight
         else:
             tokenizer = T5Tokenizer.from_pretrained(config.base_t5_model)
-            model = load_model(T5ForConditionalGeneration, T5Config, config.base_t5_model)
+            model = load_model(T5ForConditionalGeneration, T5Config, config)
         super().__init__(config, model, tokenizer, is_classifier=True)
         self.config = config
         # log the config values
