@@ -242,7 +242,7 @@ def main(
         ],
         log_every_n_steps=100,
         progress_bar_refresh_rate=0 if disable_progress_bar else 20,
-        tpu_cores=config.tpu_cores
+        tpu_cores=config.tpu_cores if config.tpu_cores else None
     )
 
     trainer.fit(pl_module)
