@@ -129,7 +129,7 @@ class T5BaseModel(pl.LightningModule):
 
     def train_dataloader(self):
         return DataLoader(
-            self.train_dataset, num_workers=4, shuffle=True, drop_last=True,
+            self.train_dataset, num_workers=4 if self.config.tpu_cores == 0 else 1, shuffle=True, drop_last=True,
             batch_size=self.config.batch_size, collate_fn=self.collate_fn)
 
     def get_progress_bar_dict(self):
@@ -140,7 +140,7 @@ class T5BaseModel(pl.LightningModule):
 
     def val_dataloader(self):
         return DataLoader(
-            self.valid_dataset, num_workers=4, shuffle=False, drop_last=False,
+            self.valid_dataset, num_workers=4 if self.config.tpu_cores == 0 else 1, shuffle=False, drop_last=False,
             batch_size=self.config.batch_size*2, collate_fn=self.collate_fn)
 
     def validation_step(self, batch, batch_idx):
