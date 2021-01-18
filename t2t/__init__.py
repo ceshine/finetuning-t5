@@ -181,12 +181,13 @@ class T5BaseModel(pl.LightningModule):
     #         }, step=self.global_step)
     #     return loss
 
-    # def training_step(self, batch, batch_idx):
-    #     loss = self.config.loss_fn(
-    #         self.forward(batch[0]),
-    #         batch[1]
-    #     )
-    #     return {"loss": loss, "log": batch_idx % self.trainer.accumulate_grad_batches == 0}
+    def training_step(self, batch, batch_idx):
+        loss = self.config.loss_fn(
+            self.forward(batch[0]),
+            batch[1]
+        )
+        return loss
+        # return {"loss": loss, "log": batch_idx % self.trainer.accumulate_grad_batches == 0}
 
     def configure_optimizers(self):
         optimizer = pls.optimizers.RAdam(
