@@ -241,7 +241,7 @@ def main(
             # pl.loggers.WandbLogger(project="t5-paraphrase")
         ],
         log_every_n_steps=100,
-        progress_bar_refresh_rate=0 if disable_progress_bar else 2,
+        progress_bar_refresh_rate=0 if disable_progress_bar else 20,
         tpu_cores=config.tpu_cores
     )
 
