@@ -172,21 +172,21 @@ class T5BaseModel(pl.LightningModule):
             return flag
         return False
 
-    def training_step_end(self, outputs):
-        loss = outputs["loss"].mean()
-        self.train_loss_tracker.update(loss.detach())
-        if self._should_log(outputs["log"]):
-            self.logger.log_metrics({
-                "train_loss": self.train_loss_tracker.value
-            }, step=self.global_step)
-        return loss
+    # def training_step_end(self, outputs):
+    #     loss = outputs["loss"].mean()
+    #     self.train_loss_tracker.update(loss.detach())
+    #     if self._should_log(outputs["log"]):
+    #         self.logger.log_metrics({
+    #             "train_loss": self.train_loss_tracker.value
+    #         }, step=self.global_step)
+    #     return loss
 
-    def training_step(self, batch, batch_idx):
-        loss = self.config.loss_fn(
-            self.forward(batch[0]),
-            batch[1]
-        )
-        return {"loss": loss, "log": batch_idx % self.trainer.accumulate_grad_batches == 0}
+    # def training_step(self, batch, batch_idx):
+    #     loss = self.config.loss_fn(
+    #         self.forward(batch[0]),
+    #         batch[1]
+    #     )
+    #     return {"loss": loss, "log": batch_idx % self.trainer.accumulate_grad_batches == 0}
 
     def configure_optimizers(self):
         optimizer = pls.optimizers.RAdam(

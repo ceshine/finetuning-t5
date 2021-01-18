@@ -143,7 +143,7 @@ class T5Model(T5BaseModel):
         }
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler
+            # 'lr_scheduler': scheduler
         }
 
 
