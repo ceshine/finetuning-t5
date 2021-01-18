@@ -99,6 +99,7 @@ class BaseConfig:
     loss_fn: Callable
     num_gpus: int = 1
     grad_accu: int = 1
+    tpu_cores: int = 0
 
 
 class T5BaseModel(pl.LightningModule):

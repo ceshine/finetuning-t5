@@ -190,7 +190,7 @@ def main(
     max_len: int = 64, grad_accu: int = 1,
     num_gpus: int = 1, disable_progress_bar: bool = False,
     valid_frequency: Optional[float] = None,
-    full_model: bool = False
+    full_model: bool = False, tpu_cores: int = 0
 ):
     pl.seed_everything(int(os.environ.get("SEED", 738)))
     config = Config(
@@ -203,7 +203,8 @@ def main(
         batch_size=batch_size,
         fp16=fp16,
         weight_decay=0,
-        num_gpus=num_gpus,
+        num_gpus=num_gpus if tpu_cores == 0 else 0,
+        tpu_cores=tpu_cores,
         loss_fn=single_token_cross_entropy_loss,
         decoder_only=not full_model
     )
@@ -240,7 +241,8 @@ def main(
             # pl.loggers.WandbLogger(project="t5-paraphrase")
         ],
         log_every_n_steps=100,
-        progress_bar_refresh_rate=0 if disable_progress_bar else 2
+        progress_bar_refresh_rate=0 if disable_progress_bar else 2,
+        tpu_cores=config.tpu_cores
     )
 
     trainer.fit(pl_module)
