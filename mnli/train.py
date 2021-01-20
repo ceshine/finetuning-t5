@@ -16,7 +16,7 @@ import pytorch_lightning_spells as pls
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import (
     MT5ForConditionalGeneration, MT5Tokenizer, T5ForConditionalGeneration, T5Tokenizer,
-    MT5Config, T5Config
+    MT5Config, T5Config, Adafactor
 )
 
 from t2t import BaseConfig, T5BaseModel, single_token_cross_entropy_loss
@@ -107,31 +107,31 @@ class T5Model(T5BaseModel):
             # # make sure the weights are tied
             # assert self.model.lm_head.weight is self.model.shared.weight, (
             #     self.model.shared.weight - self.model.lm_head.weight).sum()
-            optimizer = torch.optim.AdamW(
-                [
-                    {
-                        "params": (
-                            chain(
-                                self.model.encoder.block.parameters(),
-                                self.model.encoder.final_layer_norm.parameters()
-                            ) if (self.model.lm_head.weight is self.model.shared.weight) else
-                            self.model.encoder.parameters()
-                        ),
-                        "learning_rate": self.config.learning_rate / 2,
-                        "weight_decay": self.config.weight_decay / 2,
-                    },
-                    {
-                        "params": chain(
-                            self.model.decoder.block.parameters(),
-                            self.model.decoder.final_layer_norm.parameters(),
-                            self.model.lm_head.parameters()
-                        ),
-                        "learning_rate": self.config.learning_rate,
-                        "weight_decay": self.config.weight_decay
+            optimizer = Adafactor(self.model.parameters(), relative_step=True, warmup_init=True, lr=None)
+            #     [
+            #         {
+            #             "params": (
+            #                 chain(
+            #                     self.model.encoder.block.parameters(),
+            #                     self.model.encoder.final_layer_norm.parameters()
+            #                 ) if (self.model.lm_head.weight is self.model.shared.weight) else
+            #                 self.model.encoder.parameters()
+            #             ),
+            #             "learning_rate": self.config.learning_rate / 2,
+            #             "weight_decay": self.config.weight_decay / 2,
+            #         },
+            #         {
+            #             "params": chain(
+            #                 self.model.decoder.block.parameters(),
+            #                 self.model.decoder.final_layer_norm.parameters(),
+            #                 self.model.lm_head.parameters()
+            #             ),
+            #             "learning_rate": self.config.learning_rate,
+            #             "weight_decay": self.config.weight_decay
 
-                    }
-                ]
-            )
+            #         }
+            #     ]
+            # )
         print("Optimizer parameter count: {:,d}".format(np.sum([
             pls.utils.count_parameters(group["params"]) for group in optimizer.param_groups
         ])))
@@ -139,27 +139,27 @@ class T5Model(T5BaseModel):
             len(self.train_dataset) / self.config.batch_size / self.config.grad_accu  # / self.num_gpus # dpp mode
         )
         print("Steps per epochs:", steps_per_epochs)
-        n_steps = steps_per_epochs * self.config.epochs
-        lr_durations = [
-            int(n_steps*0.1),
-            int(np.ceil(n_steps*0.9)) + 1
-        ]
-        break_points = [0] + list(np.cumsum(lr_durations))[:-1]
-        scheduler = {
-            'scheduler': pls.lr_schedulers.MultiStageScheduler(
-                [
-                    pls.lr_schedulers.LinearLR(optimizer, 0.01, lr_durations[0]),
-                    CosineAnnealingLR(optimizer, lr_durations[1])
-                ],
-                start_at_epochs=break_points
-            ),
-            'interval': 'step',
-            'frequency': 1,
-            'strict': True,
-        }
+        # n_steps = steps_per_epochs * self.config.epochs
+        # lr_durations = [
+        #     int(n_steps*0.1),
+        #     int(np.ceil(n_steps*0.9)) + 1
+        # ]
+        # break_points = [0] + list(np.cumsum(lr_durations))[:-1]
+        # scheduler = {
+        #     'scheduler': pls.lr_schedulers.MultiStageScheduler(
+        #         [
+        #             pls.lr_schedulers.LinearLR(optimizer, 0.01, lr_durations[0]),
+        #             CosineAnnealingLR(optimizer, lr_durations[1])
+        #         ],
+        #         start_at_epochs=break_points
+        #     ),
+        #     'interval': 'step',
+        #     'frequency': 1,
+        #     'strict': True,
+        # }
         return {
             'optimizer': optimizer,
-            'lr_scheduler': scheduler
+            # 'lr_scheduler': scheduler
         }
 
 
@@ -237,7 +237,7 @@ def main(
             save_top_k=1,
             save_last=False
         ),
-        pl.callbacks.LearningRateMonitor(logging_interval='step'),
+        # pl.callbacks.LearningRateMonitor(logging_interval='step'),
     ]
     trainer = pl.Trainer(
         accelerator='dp' if num_gpus > 1 else None,
