@@ -141,8 +141,8 @@ class T5Model(T5BaseModel):
         print("Steps per epochs:", steps_per_epochs)
         n_steps = steps_per_epochs * self.config.epochs
         lr_durations = [
-            int(n_steps*0.05),
-            int(np.ceil(n_steps*0.95)) + 1
+            int(n_steps*0.1),
+            int(np.ceil(n_steps*0.9)) + 1
         ]
         break_points = [0] + list(np.cumsum(lr_durations))[:-1]
         scheduler = {
