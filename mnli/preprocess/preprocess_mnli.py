@@ -36,7 +36,7 @@ if __name__ == "__main__":
         print(df["premise"].str.len().describe())
         print(all_dfs[i].shape)
     df_train, df_test_matched, df_test_mismatched = all_dfs
-    sss = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    sss = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=42)
     for train_index, valid_index in sss.split(df_train, df_train["label"]):
         df_valid = df_train.iloc[valid_index].reset_index(drop=True)
         df_train = df_train.iloc[train_index].reset_index(drop=True)
