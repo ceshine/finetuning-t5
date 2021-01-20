@@ -93,15 +93,15 @@ class T5Model(T5BaseModel):
                 pls.utils.set_trainable(self.model.decoder.block, False)
                 pls.utils.set_trainable(self.model.decoder.final_layer_norm, False)
                 params = self.model.lm_head.parameters()
-            optimizer = torch.optim.AdamW(
+            optimizer = Adafactor(  # torch.optim.AdamW(
                 [
                     {
                         "params": params,
-                        "learning_rate": self.config.learning_rate,
-                        "weight_decay": self.config.weight_decay
+                        # "learning_rate": self.config.learning_rate,
+                        # "weight_decay": self.config.weight_decay
 
                     }
-                ]
+                ], relative_step=True, warmup_init=True, lr=None
             )
         else:
             # # make sure the weights are tied
@@ -207,6 +207,8 @@ def main(
     num_gpus: int = 1, disable_progress_bar: bool = False,
     valid_frequency: Optional[float] = None,
     full_model: bool = False, tpu_cores: int = 0
+
+
 ):
     pl.seed_everything(int(os.environ.get("SEED", 738)))
     config = Config(
@@ -245,7 +247,7 @@ def main(
         precision=16 if config.fp16 else 32,
         gpus=config.num_gpus,
         val_check_interval=valid_frequency if valid_frequency else 1.0,
-        gradient_clip_val=3,
+        # gradient_clip_val=3,
         max_epochs=epochs,
         # max_steps=steps,
         callbacks=callbacks,
