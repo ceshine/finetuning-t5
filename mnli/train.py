@@ -335,7 +335,7 @@ class T5Model(T5BaseModel):
                 self.model.parameters(),
                 relative_step=False,
                 warmup_init=False, clip_threshold=1.0, lr=self.config.learning_rate,
-                scale_parameter=False
+                scale_parameter=True
             )
             #     [
             #         {
