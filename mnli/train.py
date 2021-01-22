@@ -246,7 +246,7 @@ def main(
             save_top_k=1,
             save_last=False
         ),
-        # pl.callbacks.LearningRateMonitor(logging_interval='step'),
+        pl.callbacks.LearningRateMonitor(logging_interval='step'),
     ]
     trainer = pl.Trainer(
         accelerator='dp' if num_gpus > 1 else None,
