@@ -162,8 +162,7 @@ class Adafactor(torch.optim.Optimizer):
             loss = closure()
 
         for group in self.param_groups:
-            flag = False
-            for p in group["params"]:
+            for i, p in enumerate(group["params"]):
                 if p.grad is None:
                     continue
                 grad = p.grad.data
@@ -205,10 +204,9 @@ class Adafactor(torch.optim.Optimizer):
 
                 state["step"] += 1
                 state["RMS"] = self._rms(p_data_fp32)
-                group["lr"] = self._get_lr(group, state)
-                if state["step"] % 100 == 0 and flag is False:
-                    print(group["lr"])
-                    flag = True
+                lr = self._get_lr(group, state)
+                if state["step"] % 100 == 0 and i == 6:
+                    print(lr)
 
                 beta2t = 1.0 - math.pow(state["step"], group["decay_rate"])
                 update = (grad ** 2) + group["eps"][0]
@@ -229,7 +227,7 @@ class Adafactor(torch.optim.Optimizer):
                     update = exp_avg_sq.rsqrt().mul_(grad)
 
                 update.div_((self._rms(update) / group["clip_threshold"]).clamp_(min=1.0))
-                update.mul_(group["lr"])
+                update.mul_(lr)
 
                 if use_first_moment:
                     exp_avg = state["exp_avg"]
