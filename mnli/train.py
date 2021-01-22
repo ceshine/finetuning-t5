@@ -323,8 +323,8 @@ class T5Model(T5BaseModel):
 
                     }
                 ],
-                relative_step=True, warmup_init=True,
-                clip_threshold=1.0, lr=self.config.learning_rate,
+                relative_step=False,
+                warmup_init=False, clip_threshold=1.0, lr=self.config.learning_rate,
                 scale_parameter=True
             )
         else:
@@ -333,8 +333,8 @@ class T5Model(T5BaseModel):
             #     self.model.shared.weight - self.model.lm_head.weight).sum()
             optimizer = Adafactor(
                 self.model.parameters(),
-                relative_step=True, warmup_init=True,
-                clip_threshold=1.0, lr=self.config.learning_rate,
+                relative_step=False,
+                warmup_init=False, clip_threshold=1.0, lr=self.config.learning_rate,
                 scale_parameter=True
             )
             #     [
@@ -368,27 +368,27 @@ class T5Model(T5BaseModel):
             len(self.train_dataset) / self.config.batch_size / self.config.grad_accu  # / self.num_gpus # dpp mode
         )
         print("Steps per epochs:", steps_per_epochs)
-        # n_steps = steps_per_epochs * self.config.epochs
-        # lr_durations = [
-        #     int(n_steps*0.2),
-        #     int(np.ceil(n_steps*0.8)) + 1
-        # ]
-        # break_points = [0] + list(np.cumsum(lr_durations))[:-1]
-        # scheduler = {
-        #     'scheduler': pls.lr_schedulers.MultiStageScheduler(
-        #         [
-        #             pls.lr_schedulers.LinearLR(optimizer, 0.0001, lr_durations[0]),
-        #             CosineAnnealingLR(optimizer, lr_durations[1])
-        #         ],
-        #         start_at_epochs=break_points
-        #     ),
-        #     'interval': 'step',
-        #     'frequency': 1,
-        #     'strict': True,
-        # }
+        n_steps = steps_per_epochs * self.config.epochs
+        lr_durations = [
+            int(n_steps*0.2),
+            int(np.ceil(n_steps*0.8)) + 1
+        ]
+        break_points = [0] + list(np.cumsum(lr_durations))[:-1]
+        scheduler = {
+            'scheduler': pls.lr_schedulers.MultiStageScheduler(
+                [
+                    pls.lr_schedulers.LinearLR(optimizer, 0.0001, lr_durations[0]),
+                    CosineAnnealingLR(optimizer, lr_durations[1])
+                ],
+                start_at_epochs=break_points
+            ),
+            'interval': 'step',
+            'frequency': 1,
+            'strict': True,
+        }
         return {
             'optimizer': optimizer,
-            # 'lr_scheduler': scheduler
+            'lr_scheduler': scheduler
         }
 
 
