@@ -235,7 +235,7 @@ class Adafactor(torch.optim.Optimizer):
                     update = exp_avg
 
                 if group["weight_decay"] != 0:
-                    p_data_fp32.add_(-group["weight_decay"] * group["lr"], p_data_fp32)
+                    p_data_fp32.add_(-group["weight_decay"] * lr, p_data_fp32)
 
                 p_data_fp32.add_(-update)
 
