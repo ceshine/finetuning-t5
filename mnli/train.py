@@ -101,13 +101,18 @@ class T5Model(T5BaseModel):
                         # "weight_decay": self.config.weight_decay
 
                     }
-                ], relative_step=True, warmup_init=True, lr=None
+                ],
+                relative_step=False, warmup_init=True,
+                lr=self.config.learning_rate, clip_threshold=1.0
             )
         else:
             # # make sure the weights are tied
             # assert self.model.lm_head.weight is self.model.shared.weight, (
             #     self.model.shared.weight - self.model.lm_head.weight).sum()
-            optimizer = Adafactor(self.model.parameters(), relative_step=True, warmup_init=True, lr=None)
+            optimizer = Adafactor(
+                self.model.parameters(), relative_step=False,
+                warmup_init=True, lr=self.config.learning_rate
+            )
             #     [
             #         {
             #             "params": (
