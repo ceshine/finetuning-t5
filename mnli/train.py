@@ -102,7 +102,7 @@ class T5Model(T5BaseModel):
 
                     }
                 ],
-                relative_step=False, warmup_init=True,
+                relative_step=False, warmup_init=False,
                 lr=self.config.learning_rate, clip_threshold=1.0
             )
         else:
@@ -111,7 +111,7 @@ class T5Model(T5BaseModel):
             #     self.model.shared.weight - self.model.lm_head.weight).sum()
             optimizer = Adafactor(
                 self.model.parameters(), relative_step=False,
-                warmup_init=True, lr=self.config.learning_rate
+                warmup_init=False, lr=self.config.learning_rate
             )
             #     [
             #         {
