@@ -103,7 +103,7 @@ class T5Model(T5BaseModel):
                     }
                 ],
                 relative_step=True,
-                warmup_init=True, clip_threshold=1.0, lr=self.config.learning_rate,
+                warmup_init=True, clip_threshold=1.0,  # lr=self.config.learning_rate,
                 scale_parameter=True
             )
         else:
@@ -113,7 +113,7 @@ class T5Model(T5BaseModel):
             optimizer = Adafactor(
                 self.model.parameters(),
                 relative_step=True,
-                warmup_init=True, clip_threshold=1.0, lr=self.config.learning_rate,
+                warmup_init=True, clip_threshold=1.0,  # lr=self.config.learning_rate,
                 scale_parameter=True
             )
             #     [
