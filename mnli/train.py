@@ -153,7 +153,7 @@ class T5Model(T5BaseModel):
         scheduler = {
             'scheduler': pls.lr_schedulers.MultiStageScheduler(
                 [
-                    pls.lr_schedulers.LinearLR(optimizer, 0.01, lr_durations[0]),
+                    pls.lr_schedulers.LinearLR(optimizer, 0.0001, lr_durations[0]),
                     CosineAnnealingLR(optimizer, lr_durations[1])
                 ],
                 start_at_epochs=break_points
