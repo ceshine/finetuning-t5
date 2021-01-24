@@ -485,7 +485,7 @@ def main(
         num_gpus=num_gpus if tpu_cores == 0 else 0,
         tpu_cores=tpu_cores,
         loss_fn=single_token_cross_entropy_loss,
-        decoder_only=not full_model,
+        decoder_only=not (full_model or freeze_embeddings),
         freeze_embeddings=freeze_embeddings
     )
     # print(config)
