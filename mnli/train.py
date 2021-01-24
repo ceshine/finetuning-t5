@@ -1,6 +1,7 @@
 import os
 import gc
 import math
+import json
 from itertools import chain
 from pathlib import Path
 from typing import List, Optional
@@ -262,6 +263,10 @@ def load_model(model_class, model_config_class, config):
             model_config_class.from_pretrained(model_path)
         )
         model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
+        if (Path(model_path) / "kept_ids.json").exists():
+            with open(Path(model_path) / "kept_ids.json") as fin:
+                kept_ids = np.asarray(json.load(fin))
+            model.shared.weight = model.shared.weight[kept_ids]
         model.load_state_dict(torch.load(Path(model_path) / "pytorch_model.bin"))
     return model
 
