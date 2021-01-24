@@ -247,6 +247,7 @@ class Adafactor(torch.optim.Optimizer):
 class Config(BaseConfig):
     dataset: Corpus = Corpus.KAGGLE
     decoder_only: bool = True
+    freeze_embeddings: bool = False
     num_classes: int = 3
 
 
@@ -319,6 +320,21 @@ class T5Model(T5BaseModel):
 
                     }
                 ],
+                relative_step=False, warmup_init=False,
+                clip_threshold=1.0, lr=self.config.learning_rate,
+                scale_parameter=True
+            )
+        elif self.config.freeze_embeddings and not (self.model.lm_head.weight is self.model.shared.weight):
+            # freezing embeddings is pointless when the weights are tied
+            pls.utils.set_trainable(self.model.shared, False)
+            optimizer = Adafactor(
+                chain(
+                    self.model.encoder.block.parameters(),
+                    self.model.encoder.final_layer_norm.parameters(),
+                    self.model.decoder.block.parameters(),
+                    self.model.decoder.final_layer_norm.parameters(),
+                    self.model.lm_head.parameters()
+                ),
                 relative_step=False, warmup_init=False,
                 clip_threshold=1.0, lr=self.config.learning_rate,
                 scale_parameter=True
@@ -431,9 +447,8 @@ def main(
     max_len: int = 64, grad_accu: int = 1,
     num_gpus: int = 1, disable_progress_bar: bool = False,
     valid_frequency: Optional[float] = None,
-    full_model: bool = False, tpu_cores: int = 0
-
-
+    full_model: bool = False, tpu_cores: int = 0,
+    freeze_embeddings: bool = False
 ):
     pl.seed_everything(int(os.environ.get("SEED", 738)))
     config = Config(
@@ -449,7 +464,8 @@ def main(
         num_gpus=num_gpus if tpu_cores == 0 else 0,
         tpu_cores=tpu_cores,
         loss_fn=single_token_cross_entropy_loss,
-        decoder_only=not full_model
+        decoder_only=not full_model,
+        freeze_embeddings=freeze_embeddings
     )
     # print(config)
 
