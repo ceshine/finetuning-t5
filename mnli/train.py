@@ -345,15 +345,14 @@ class T5Model(T5BaseModel):
         elif self.config.freeze_embeddings and not (self.model.lm_head.weight is self.model.shared.weight):
             print("Embeddings frozen")
             # freezing embeddings is pointless when the weights are tied
-            # pls.utils.set_trainable(self.model.shared, False)
+            pls.utils.set_trainable(self.model.shared, False)
             optimizer = Adafactor(
                 chain(
                     self.model.encoder.block.parameters(),
                     self.model.encoder.final_layer_norm.parameters(),
                     self.model.decoder.block.parameters(),
                     self.model.decoder.final_layer_norm.parameters(),
-                    self.model.lm_head.parameters(),
-                    self.model.shared.parameters()
+                    self.model.lm_head.parameters()
                 ),
                 relative_step=False, warmup_init=False,
                 clip_threshold=1.0, lr=self.config.learning_rate,
