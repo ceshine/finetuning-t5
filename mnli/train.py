@@ -258,6 +258,10 @@ def load_model(model_class, model_config_class, config):
         model = model_class.from_pretrained(model_path)
         # replace the lm_head
         model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
+        if (Path(model_path) / "kept_ids.json").exists():
+            with open(Path(model_path) / "kept_ids.json") as fin:
+                kept_ids = np.asarray(json.load(fin))
+            model.shared.weight = model.shared.weight[kept_ids]
     except RuntimeError:
         model = model_class(
             model_config_class.from_pretrained(model_path)
