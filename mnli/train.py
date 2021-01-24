@@ -313,6 +313,7 @@ class T5Model(T5BaseModel):
 
     def configure_optimizers(self):
         if self.config.decoder_only:
+            print("Decoder only")
             pls.utils.set_trainable(self.model.encoder.block, False)
             pls.utils.set_trainable(self.model.encoder.final_layer_norm, False)
             params = self.model.lm_head.parameters()
@@ -342,6 +343,7 @@ class T5Model(T5BaseModel):
                 scale_parameter=True
             )
         elif self.config.freeze_embeddings and not (self.model.lm_head.weight is self.model.shared.weight):
+            print("Embeddings frozen")
             # freezing embeddings is pointless when the weights are tied
             # pls.utils.set_trainable(self.model.shared, False)
             optimizer = Adafactor(
@@ -358,6 +360,7 @@ class T5Model(T5BaseModel):
                 scale_parameter=True
             )
         else:
+            print("Full model")
             # # make sure the weights are tied
             # assert self.model.lm_head.weight is self.model.shared.weight, (
             #     self.model.shared.weight - self.model.lm_head.weight).sum()
