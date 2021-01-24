@@ -2,6 +2,7 @@ import os
 import gc
 import math
 import json
+import shutil
 from itertools import chain
 from pathlib import Path
 from typing import List, Optional
@@ -528,8 +529,11 @@ def main(
     pl_module.load_state_dict(torch.load(callbacks[0].best_model_path)["state_dict"])
     del trainer
     gc.collect()
-    pl_module.model.save_pretrained(CACHE_DIR / f"{model_name}_best")
-    pl_module.tokenizer.save_pretrained(CACHE_DIR / f"{model_name}_best")
+    save_path = CACHE_DIR / f"{model_name}_best"
+    pl_module.model.save_pretrained(save_path)
+    pl_module.tokenizer.save_pretrained(save_path)
+    if (Path(t5_model) / "kept_ids.json").exists():
+        shutil.copy(Path(t5_model) / "kept_ids.json", save_path / "kept_ids.json")
     print("Best model saved")
 
 
