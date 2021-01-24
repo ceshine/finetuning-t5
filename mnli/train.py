@@ -257,8 +257,12 @@ def shrink_vocab(model_path, model):
         with open(Path(model_path) / "kept_ids.json") as fin:
             kept_ids = np.asarray(json.load(fin))
         extracted_weights = model.shared.weight.data[kept_ids]
+        print(extracted_weights.shape)
+        print(model.shared.weight.shape)
         model.shared = torch.nn.Embedding(*extracted_weights.shape)
         model.shared.weight.data = extracted_weights
+        model.decoder.embed_tokens = model.shared
+        model.encoder.embed_tokens = model.shared
 
 
 def load_model(model_class, model_config_class, config):
