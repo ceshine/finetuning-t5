@@ -13,7 +13,7 @@ from transformers import (
 from torch.utils.data import DataLoader
 
 from preprocess.tokenize_dataset import Corpus
-from train import XNLIDataset
+from train import XNLIDataset, shrink_vocab
 from t2t import collate_batch
 
 
@@ -32,6 +32,7 @@ def main(
         model = T5ForConditionalGeneration(
             T5Config.from_pretrained(model_path)
         ).eval()
+    shrink_vocab(model_path, model)
     model.lm_head = torch.nn.Linear(model.lm_head.in_features, 3, bias=False)
     model.load_state_dict(torch.load(Path(model_path) / "pytorch_model.bin"))
     model = model.cuda()
