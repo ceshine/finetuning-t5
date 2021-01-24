@@ -252,25 +252,28 @@ class Config(BaseConfig):
     num_classes: int = 3
 
 
+def shrink_vocab(model_path, model):
+    if (Path(model_path) / "kept_ids.json").exists():
+        with open(Path(model_path) / "kept_ids.json") as fin:
+            kept_ids = np.asarray(json.load(fin))
+        extracted_weights = model.shared.weight.data[kept_ids]
+        model.shared = torch.nn.embeddings(*extracted_weights.shape)
+        model.shared.weight.data = extracted_weights
+
+
 def load_model(model_class, model_config_class, config):
     model_path = config.base_t5_model
     try:
         model = model_class.from_pretrained(model_path)
         # replace the lm_head
         model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
-        if (Path(model_path) / "kept_ids.json").exists():
-            with open(Path(model_path) / "kept_ids.json") as fin:
-                kept_ids = np.asarray(json.load(fin))
-            model.shared.weight = model.shared.weight[kept_ids]
+        shrink_vocab(model_path, model)
     except RuntimeError:
         model = model_class(
             model_config_class.from_pretrained(model_path)
         )
         model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
-        if (Path(model_path) / "kept_ids.json").exists():
-            with open(Path(model_path) / "kept_ids.json") as fin:
-                kept_ids = np.asarray(json.load(fin))
-            model.shared.weight = model.shared.weight[kept_ids]
+        shrink_vocab(model_path, model)
         model.load_state_dict(torch.load(Path(model_path) / "pytorch_model.bin"))
     return model
 
