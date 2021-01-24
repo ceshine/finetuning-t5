@@ -350,7 +350,8 @@ class T5Model(T5BaseModel):
                     self.model.encoder.final_layer_norm.parameters(),
                     self.model.decoder.block.parameters(),
                     self.model.decoder.final_layer_norm.parameters(),
-                    self.model.lm_head.parameters()
+                    self.model.lm_head.parameters(),
+                    self.model.shared.parameters()
                 ),
                 relative_step=False, warmup_init=False,
                 clip_threshold=1.0, lr=self.config.learning_rate,
