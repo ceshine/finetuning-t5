@@ -279,7 +279,7 @@ def load_model(model_class, model_config_class, config):
         )
         model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
         shrink_vocab(model_path, model)
-        model.load_state_dict(str(torch.load(Path(model_path) / "pytorch_model.bin")))
+        model.load_state_dict(torch.load(str(Path(model_path) / "pytorch_model.bin")))
     return model
 
 
