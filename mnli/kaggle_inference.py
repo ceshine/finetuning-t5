@@ -64,10 +64,10 @@ for input_batch, _ in data_loader:
     preds.append(preds_local)
 
 preds = np.concatenate(preds)
-inverse_label_dict = {key: tokenizer.decode([key]) for key in np.unique(preds)}
+# inverse_label_dict = {key: tokenizer.decode([key]) for key in np.unique(preds)}
 
 df_sub = pd.DataFrame({
     "id": df_test.id.values,
-    "prediction": [inverse_label_dict[x] for x in preds]
+    "prediction": preds  # [inverse_label_dict[x] for x in preds]
 })
 df_sub.to_csv("submission.csv", index=False)
