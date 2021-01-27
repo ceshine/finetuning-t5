@@ -506,7 +506,7 @@ def main(
         accelerator='dp' if num_gpus > 1 else None,
         # amp_backend="apex", amp_level='O1',
         precision=16 if config.fp16 else 32,
-        gpus=config.num_gpus,
+        gpus=config.num_gpus if tpu_cores == 0 else None,
         val_check_interval=valid_frequency if valid_frequency else 1.0,
         # gradient_clip_val=3,
         max_epochs=epochs,
@@ -520,7 +520,7 @@ def main(
             # pl.loggers.WandbLogger(project="t5-paraphrase")
         ],
         log_every_n_steps=100,
-        progress_bar_refresh_rate=0 if disable_progress_bar else 20,
+        progress_bar_refresh_rate=0 if disable_progress_bar else (20 if tpu_cores == 0 else 5),
         tpu_cores=config.tpu_cores if config.tpu_cores else None
     )
 
