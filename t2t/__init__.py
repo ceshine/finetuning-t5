@@ -179,11 +179,14 @@ class T5BaseModel(pl.LightningModule):
         return self.model(**input_tensors)[0]
 
     def train_dataloader(self):
-        sampler = SortishSampler(
-            self.train_dataset,
-            key=lambda x: len(self.train_dataset[x][0]),
-            bs=self.config.batch_size
-        )
+        if self.config.tpu_cores:
+            sampler = None
+        else:
+            sampler = SortishSampler(
+                self.train_dataset,
+                key=lambda x: len(self.train_dataset[x][0]),
+                bs=self.config.batch_size
+            )
         return DataLoader(
             self.train_dataset, num_workers=4 if self.config.tpu_cores == 0 else 1, shuffle=False, drop_last=True,
             batch_size=self.config.batch_size, collate_fn=self.collate_fn, sampler=sampler)
