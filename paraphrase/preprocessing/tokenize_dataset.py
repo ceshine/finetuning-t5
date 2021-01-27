@@ -36,11 +36,11 @@ def process_file(data: pd.DataFrame, tokenizer: T5Tokenizer, batch_size: int):
             target_buffer.append(target)
         # tokenize inputs
         tokenized_inputs = tokenizer.batch_encode_plus(
-            input_buffer
+            input_buffer, return_attention_mask=False
         )
         # tokenize targets
         tokenized_targets = tokenizer.batch_encode_plus(
-            target_buffer
+            target_buffer, return_attention_mask=False
         )
         input_ids.extend(tokenized_inputs["input_ids"])
         target_ids.extend(tokenized_targets["input_ids"])
