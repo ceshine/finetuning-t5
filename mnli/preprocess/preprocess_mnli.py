@@ -1,3 +1,4 @@
+import csv
 from pathlib import Path
 
 import pandas as pd
@@ -16,9 +17,16 @@ def encode_label(df):
 
 if __name__ == "__main__":
     pd.set_option('display.float_format', lambda x: '%.0f' % x)
-    df_train = pd.read_csv("data/multinli_1.0/multinli_1.0_train.txt", sep="\t", error_bad_lines=False)
-    df_test_matched = pd.read_csv("data/multinli_1.0/multinli_1.0_dev_matched.txt", sep="\t")
-    df_test_mismatched = pd.read_csv("data/multinli_1.0/multinli_1.0_dev_mismatched.txt", sep="\t")
+    df_train = pd.read_csv(
+        "data/multinli_1.0/multinli_1.0_train.txt",
+        sep="\t", error_bad_lines=False,
+        quoting=csv.QUOTE_NONE, low_memory=False
+    )
+    df_test_matched = pd.read_csv(
+        "data/multinli_1.0/multinli_1.0_dev_matched.txt", sep="\t", quoting=csv.QUOTE_NONE, low_memory=False)
+    df_test_mismatched = pd.read_csv(
+        "data/multinli_1.0/multinli_1.0_dev_mismatched.txt",
+        sep="\t", quoting=csv.QUOTE_NONE, low_memory=False)
     all_dfs = [df_train, df_test_matched, df_test_mismatched]
     for i, df in enumerate(all_dfs):
         # print(df["gold_label"].unique())
