@@ -266,17 +266,17 @@ def shrink_vocab(model_path, model):
         model.encoder.embed_tokens = model.shared
 
 
-def load_model(model_class, model_config_class, config):
+def load_model(model_class, model_config_class, config: Config):
     model_path = config.base_t5_model
+    model_config = model_config_class.from_pretrained(model_path)
+    model_config.gradient_checkpointing = True
     try:
-        model = model_class.from_pretrained(model_path)
+        model = model_class.from_pretrained(model_path, config=model_config)
         # replace the lm_head
         model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
         shrink_vocab(model_path, model)
     except RuntimeError:
-        model = model_class(
-            model_config_class.from_pretrained(model_path)
-        )
+        model = model_class(model_config)
         model.lm_head = torch.nn.Linear(model.lm_head.in_features, config.num_classes, bias=False)
         shrink_vocab(model_path, model)
         model.load_state_dict(torch.load(str(Path(model_path) / "pytorch_model.bin")))
