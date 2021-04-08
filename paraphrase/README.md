@@ -3,10 +3,11 @@
 ## Environment
 
 - Python 3.8.3
-- PyTorch 1.5
+- PyTorch >= 1.6
 - Transformers >= 3.1.0
 - nltk 3.2.5
-- Pytorch Lightning 1.1.3
+- PyTorch Lightning 1.1.3
+- PyTorch Lightning Spells
 
 ## Datasets
 
