@@ -2,7 +2,7 @@
 
 Tasks:
 
-- [Robust paraphrasing](/paraphrase).
-- [MultiNLI/XNLI](/mnlis)
+- [Robust paraphrasing](/paraphrase)
+- [MultiNLI/XNLI](/mnli)
 
 Note: Documentation is still WIP. Might not reflect the latest code.
