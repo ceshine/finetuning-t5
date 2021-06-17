@@ -12,7 +12,7 @@ Directly [fine-tune mT5 on the multi-lingual corpus](https://www.kaggle.com/cesh
 
 ## Transfer learning from English-only corpus
 
-Firstly., [Fine-tune mT5 on English-only corpus (MultiNLI)](https://www.kaggle.com/ceshine/preprocess-and-finetune-mt5?scriptVersionId=57553107).
+Firstly, [Fine-tune mT5 on English-only corpus (MultiNLI)](https://www.kaggle.com/ceshine/preprocess-and-finetune-mt5?scriptVersionId=57553107).
 
 Then [use the fine-tuned model fo make prediction on the multi-lingual corpus](https://www.kaggle.com/ceshine/mt5-base-mnli-zero-shot?scriptVersionId=53635578). Accuracy: **0.75996**.
 
