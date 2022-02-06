@@ -53,6 +53,8 @@ Use `python train_t2t.py --help` to see available options.
 
 ## Pre-trained Models
 
+[Demo app on Huggingface Spaces](https://huggingface.co/spaces/ceshine/t5-paraphrasing).
+
 ### PAWS and Quora
 
 A pre-trained model trained on both PAWS and Quora datasets [is published on Huggingface Model Hub](https://huggingface.co/ceshine/t5-paraphrase-quora-paws). You can use the model to paraphrase sentences by running the following command:
